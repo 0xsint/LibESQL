@@ -1,0 +1,8 @@
+## Title: LibESQL Example - Top abilities after each fight
+## Author: Vixen Hunny
+## Version: 1.0.0
+## APIVersion: 101049 101050
+## DependsOn: LibESQL>=10000
+## Description: Example add-on for LibESQL: Top abilities after each fight.
+
+LibESQL_Example_CombatSummary.lua

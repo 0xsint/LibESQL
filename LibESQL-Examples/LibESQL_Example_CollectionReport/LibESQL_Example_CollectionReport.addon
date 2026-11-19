@@ -1,0 +1,8 @@
+## Title: LibESQL Example - GROUP BY report of your collections
+## Author: Vixen Hunny
+## Version: 1.0.0
+## APIVersion: 101049 101050
+## DependsOn: LibESQL>=10000
+## Description: Example add-on for LibESQL: GROUP BY report of your collections.
+
+LibESQL_Example_CollectionReport.lua

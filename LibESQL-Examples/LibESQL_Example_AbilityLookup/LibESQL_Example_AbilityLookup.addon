@@ -1,0 +1,8 @@
+## Title: LibESQL Example - Ability lookup by id or name
+## Author: Vixen Hunny
+## Version: 1.0.0
+## APIVersion: 101049 101050
+## DependsOn: LibESQL>=10000
+## Description: Example add-on for LibESQL: Ability lookup by id or name.
+
+LibESQL_Example_AbilityLookup.lua

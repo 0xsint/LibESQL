@@ -1,0 +1,8 @@
+## Title: LibESQL Example - Basics: Query, Select, Scalar and ? parameters
+## Author: Vixen Hunny
+## Version: 1.0.0
+## APIVersion: 101049 101050
+## DependsOn: LibESQL>=10000
+## Description: Example add-on for LibESQL: Basics: Query, Select, Scalar and ? parameters.
+
+LibESQL_Example_Basics.lua

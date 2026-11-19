@@ -1,0 +1,9 @@
+## Title: LibESQL Example - Settings panel with ready-made queries (works on console)
+## Author: Vixen Hunny
+## Version: 1.0.0
+## APIVersion: 101049 101050
+## DependsOn: LibESQL>=10000
+## OptionalDependsOn: LibHarvensAddonSettings
+## Description: Example add-on for LibESQL: Settings panel with ready-made queries (works on console).
+
+LibESQL_Example_ConsolePanel.lua

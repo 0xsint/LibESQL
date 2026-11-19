@@ -1,0 +1,8 @@
+## Title: LibESQL Example - Register your own table and query it
+## Author: Vixen Hunny
+## Version: 1.0.0
+## APIVersion: 101049 101050
+## DependsOn: LibESQL>=10000
+## Description: Example add-on for LibESQL: Register your own table and query it.
+
+LibESQL_Example_CustomTable.lua

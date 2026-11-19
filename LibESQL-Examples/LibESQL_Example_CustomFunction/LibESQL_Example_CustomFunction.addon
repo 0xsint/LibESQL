@@ -1,0 +1,8 @@
+## Title: LibESQL Example - Add your own SQL functions
+## Author: Vixen Hunny
+## Version: 1.0.0
+## APIVersion: 101049 101050
+## DependsOn: LibESQL>=10000
+## Description: Example add-on for LibESQL: Add your own SQL functions.
+
+LibESQL_Example_CustomFunction.lua

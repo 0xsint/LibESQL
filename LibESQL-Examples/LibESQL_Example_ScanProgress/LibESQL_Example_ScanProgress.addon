@@ -1,0 +1,8 @@
+## Title: LibESQL Example - Build the ability and item indexes with progress
+## Author: Vixen Hunny
+## Version: 1.0.0
+## APIVersion: 101049 101050
+## DependsOn: LibESQL>=10000
+## Description: Example add-on for LibESQL: Build the ability and item indexes with progress.
+
+LibESQL_Example_ScanProgress.lua
