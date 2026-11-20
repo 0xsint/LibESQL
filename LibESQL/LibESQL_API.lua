@@ -77,6 +77,106 @@ function E.Validate(text)
 end
 
 ---------------------------------------------------------------------------
+-- Writing to your own tables
+---------------------------------------------------------------------------
+
+-- Create a table you can INSERT into. columns: { "id INT", "name TEXT" } or
+-- { {name = "id", type = "int"}, ... }. Returns true (created), false (it
+-- already existed and ifNotExists was set), or nil + error text.
+function E.CreateTable(name, columns, ifNotExists)
+    local cols = {}
+    for i, c in ipairs(columns or {}) do
+        if type(c) == "string" then
+            local n, t = c:match("^%s*([%w_]+)%s*([%w_]*)")
+            cols[i] = { name = n, type = t ~= "" and t:lower() or nil }
+        else
+            cols[i] = { name = c.name or c[1], type = c.type or c[2] }
+        end
+        if not cols[i].name then return nil, "bad column definition #" .. i end
+    end
+    local ok, a, b = pcall(E.CreateEmptyUserTable, name, cols, ifNotExists)
+    if not ok then return nil, SQL.ErrorText(a) end
+    return b
+end
+
+-- Insert one row object ({ id = 1, name = "x" }) or an array of them.
+-- Keys are column names; missing columns are NULL. Returns the count, or nil + error text.
+function E.Insert(tableName, rowOrRows)
+    local def = E.GetTable(tableName or "")
+    if not def then return nil, "no table '" .. tostring(tableName) .. "'" end
+    local list = rowOrRows
+    if type(list) ~= "table" then return nil, "Insert needs a row table or an array of rows" end
+    if list[1] == nil or type(list[1]) ~= "table" then list = { list } end
+    local objs = {}
+    for i, row in ipairs(list) do
+        local obj = {}
+        for k, v in pairs(row) do
+            local key = type(k) == "string" and k:lower() or k
+            if not def.colIndex[key] then
+                return nil, string.format("row %d: table %s has no column '%s'", i, def.name, tostring(k))
+            end
+            obj[key] = v
+        end
+        objs[i] = obj
+    end
+    local ok, res = pcall(E.InsertRows, def, objs)
+    if not ok then return nil, SQL.ErrorText(res) end
+    return res
+end
+
+-- Update rows: Update("kills", { secs = 50 }, "boss = ?", { "Zaan" }).
+-- changes: { column = value }; use LibESQL.NULL to set NULL. where: optional SQL
+-- condition (all rows when nil), whereParams: values for its ? placeholders.
+-- Returns the number of rows changed, or nil + error text.
+function E.Update(tableName, changes, where, whereParams)
+    local def = E.GetTable(tableName or "")
+    if not def then return nil, "no table '" .. tostring(tableName) .. "'" end
+    if type(changes) ~= "table" or next(changes) == nil then return nil, "Update needs a table of { column = value } changes" end
+    local keys = {}
+    for k in pairs(changes) do
+        local key = type(k) == "string" and k:lower() or k
+        if not def.colIndex[key] then return nil, string.format("table %s has no column '%s'", def.name, tostring(k)) end
+        keys[#keys + 1] = k
+    end
+    table.sort(keys, function(a, b) return tostring(a) < tostring(b) end)
+    local sets, params = {}, {}
+    for i, k in ipairs(keys) do
+        sets[i] = k:lower() .. " = ?"
+        local v = changes[k]
+        if v == E.NULL then v = nil end
+        params[i] = v
+    end
+    local n = #keys
+    for i, v in ipairs(whereParams or {}) do params[n + i] = v end
+    params.n = n + (whereParams and (whereParams.n or #whereParams) or 0)
+    local sql = "UPDATE " .. def.name .. " SET " .. table.concat(sets, ", ")
+    if where and where ~= "" then sql = sql .. " WHERE " .. where end
+    local res, err = E.Query(sql, { params = params })
+    if not res then return nil, err end
+    return res.rowsAffected
+end
+
+-- Delete rows: Delete("kills", "boss = ?", { "Zaan" }). where: optional SQL
+-- condition; nil deletes every row (the table stays, DropTable removes it).
+-- Returns the number of rows removed, or nil + error text.
+function E.Delete(tableName, where, whereParams)
+    local def = E.GetTable(tableName or "")
+    if not def then return nil, "no table '" .. tostring(tableName) .. "'" end
+    local sql = "DELETE FROM " .. def.name
+    if where and where ~= "" then sql = sql .. " WHERE " .. where end
+    local res, err = E.Query(sql, whereParams and { params = whereParams } or nil)
+    if not res then return nil, err end
+    return res.rowsAffected
+end
+
+-- Drop one of your tables. Returns true, or nil + error text.
+function E.DropTable(name)
+    local ok, msg = E.DropUserTable((name or ""):lower())
+    if ok then return true end
+    return nil, msg
+end
+
+---------------------------------------------------------------------------
 -- Extending
 ---------------------------------------------------------------------------
 
@@ -152,3 +252,7 @@ end
 
 E.effectsSeenCount = 0
 EVENT_MANAGER:RegisterForEvent(E.name, EVENT_ADD_ON_LOADED, onLoaded)
+
+-- Everything registered up to here is built in (and read-only). This is the
+-- library's last file, so later RegisterTable calls come from other add-ons.
+E.EndBuiltinRegistration()

@@ -2,13 +2,16 @@
 
 Version 1.0.0 (`LibESQL.versionNumber` = 10000) · API 101049 / 101050 · PC/Mac and console
 
-This page lists every public function: its arguments, what it returns (including the `nil` and `false` cases), and the data structures it uses. It also covers the SQL dialect and every built-in table. For a shorter introduction, read the [README](README.md). For complete add-ons, see [LibESQL-Examples](../LibESQL-Examples/README.md).
+This page lists every public function: its arguments, what it returns (including the `nil` and `false` cases), and the data structures it uses. It also covers the SQL dialect and every built-in table.
+
+Every table that comes with LibESQL is **built in and always read-only**. That covers the game data and the `tables`/`columns` lists. Your own data goes into tables you make with `CREATE TABLE` or `SELECT ... INTO`, and you change it with `INSERT`, `UPDATE` and `DELETE` (see [Writing to your own tables](#writing-to-your-own-tables)). Those tables are saved and come back after a reload. For a shorter introduction, read the [README](README.md). For complete add-ons, see [LibESQL-Examples](../LibESQL-Examples/README.md).
 
 ## Contents
 
 - [Conventions](#conventions)
 - [Data structures](#data-structures): [result](#result), [opts](#opts), [errors](#errors), [job](#job), [table definition](#table-definition), [column definition](#column-definition)
 - [Querying](#querying): Query, QueryAsync, Select, Scalar, ToObjects, Quote, Validate
+- [Writing to your own tables](#writing-to-your-own-tables): CreateTable, Insert, Update, Delete, DropTable
 - [Schema](#schema): GetTableNames, GetColumns, GetTable, RegisterTable, Refresh
 - [Id scans](#id-scans): Scan, IsScanned
 - [SQL functions](#sql-functions-from-lua): RegisterFunction
@@ -49,10 +52,12 @@ What every query returns.
                   { 46348, nil } },           -- a NULL is a hole (nil) in the array
     truncated = false,                        -- true if opts.maxRows cut the result
     elapsedMs = 3,                            -- time to run (in-game clock)
-    message   = nil,                          -- text for INTO / DROP / REFRESH / SCAN statements
+    message   = nil,                          -- text for INTO / INSERT / UPDATE / DELETE / CREATE / DROP / REFRESH / SCAN statements
+    rowsAffected = nil,                       -- INSERT / UPDATE / DELETE only: rows inserted, changed or removed
 }
 ```
 
+- `INSERT`, `UPDATE`, `DELETE`, `CREATE TABLE`, `DROP TABLE`, `REFRESH`, `SCAN` and `HELP` return one `info` column with a line of text, which is also in `message`.
 - Arrays can have `nil` holes, so read cells with `row[c]` for `c = 1, #result.columns`. Don't use `ipairs(row)` or `#row`.
 - Column names are the alias if you gave one (`AS x`). For a plain column they are the column's name. Anything else is named by its expression text, for example `COUNT(*)`.
 - `SELECT *` over a join prefixes names that appear in more than one table, for example `s.name` and `b.name`.
@@ -101,6 +106,9 @@ The argument of [`RegisterTable`](#libesqlregistertabledef).
 | `lookup` | `function(keyValue) -> row or nil` | no | Your own lookup by key. It is used for `WHERE key = ...` and for joins on the key. |
 | `scan` | table | no* | Makes an id-scan table like `abilities`. Its fields are `from`, `to`, `gap`, `minTo`, `exists(id)`, `makeRow(id)` and `label` (see [Id scans](#id-scans)). Use this instead of `build`. |
 | `onRefresh` | `function(def)` | no | Called when the table's cache is cleared. |
+| `update` | `function(row, changes, def)` | no | Makes the table accept `UPDATE` and `LibESQL.Update`. It is called once per matching row with the row table and `{ column = newValue }` (`nil` for NULL). Apply the changes to your data. The table's cache is cleared afterwards. |
+| `delete` | `function(row, def)` | no | Makes the table accept `DELETE` and `LibESQL.Delete`. It is called once per matching row with the row table your `build` made. Remove it from your data. The table's cache is cleared afterwards. |
+| `insert` | `function(row, def)` | no | Makes the table accept `INSERT` and `LibESQL.Insert`. It is called once per row with a table keyed by lower-case column name (missing columns are `nil`). Store the row wherever your add-on keeps its data. The table's cache is cleared afterwards. |
 
 After registration the definition also has `kind` (`static`, `live`, `scan`, `user` or `temp`), `colIndex` (a map from lower-case name to column), and for cached tables `cache` and `index`.
 
@@ -185,6 +193,86 @@ Parses without running. `?` placeholders count as valid.
 
 ---
 
+## Writing to your own tables
+
+Only tables created after LibESQL has loaded can be written to:
+- tables made with `CREATE TABLE` or `SELECT ... INTO` (kind `user`)
+- tables another add-on registers with its own `insert`, `update` or `delete` function
+
+Every table LibESQL registers while it loads is **built in**. The list of built-in tables is kept inside the library, not on the table definitions, so changing a definition can't unlock one. For a built-in table:
+- `INSERT`, `UPDATE` and `DELETE`, and `LibESQL.Insert/Update/Delete`, are refused, even if a write handler or `kind = "user"` is set on its definition.
+- `DROP TABLE` is refused.
+- `CREATE TABLE` and `SELECT ... INTO` with its name are refused.
+- `RegisterTable` with its name raises an error.
+- A saved user table with the same name is never loaded over it.
+
+The same goes for another add-on's table that has no write functions: it can't be written to, dropped or replaced by a user table. `SHOW TABLES` / `SELECT name, builtin, writable FROM tables` shows which tables you can write to.
+
+User tables:
+- Are saved in `LibESQL_SV` after every change, and come back after a reload.
+- Hold at most `LibESQL.USER_TABLE_MAX_ROWS` rows.
+- Convert inserted and updated values to the column type:
+  - `INT`: numeric text becomes a number, decimals are truncated, booleans become 1/0
+  - `REAL`: numeric text becomes a number
+  - `TEXT`: values are stored as text
+  - `BOOL`: numbers and `'true'/'false'/'yes'/'no'/'1'/'0'` become booleans
+- Leave values as they are in columns of type `any`, which is what `SELECT ... INTO` makes.
+
+### LibESQL.CreateTable(name, columns, ifNotExists)
+
+- **Arguments:**
+  - `name`: string
+  - `columns`: an array of `"name TYPE"` strings (`{ "boss TEXT", "secs REAL" }`) or `{ name = , type = }` tables. A type is optional, and you can use any type name from [CREATE TABLE](#statements).
+  - `ifNotExists`: boolean
+- **Returns:** `true` when it creates the table, `false` when the table already exists and `ifNotExists` is set, or `nil, errorText`. It is an error when the name exists without `ifNotExists`, belongs to a built-in table, or no columns are given.
+- **Same as** `CREATE TABLE [IF NOT EXISTS] name (...)`.
+
+### LibESQL.Insert(tableName, row)
+
+- **Arguments:**
+  - `tableName`: string
+  - `row`: one row table, such as `{ boss = "Zaan", secs = 61.5 }`, or an array of them. Keys are column names (case-insensitive), and missing columns are `NULL`.
+- **Returns:** the number of rows inserted, or `nil, errorText`. It is an error when there is no such table, the table is read-only, a key isn't a column, or the row limit would be passed. Nothing is inserted if any row is invalid.
+- **Fires:** `RowsInserted`.
+
+### LibESQL.Update(tableName, changes, where, whereParams)
+
+- **Arguments:**
+  - `tableName`: string
+  - `changes`: `{ column = newValue, ... }` (column names are case-insensitive). Lua tables can't hold `nil`, so use `LibESQL.NULL` to set a column to `NULL`.
+  - `where`: optional SQL condition text. Leave it out to update every row.
+  - `whereParams`: optional values for the `?` placeholders in `where`
+- **Returns:** the number of rows changed (0 when nothing matched), or `nil, errorText`. It is an error when there is no such table, the table is read-only, a key isn't a column, or `where` isn't valid SQL.
+- **Fires:** `RowsUpdated`.
+- **Same as** `UPDATE tableName SET ... WHERE where`. The change values are passed as parameters, so they are never pasted into the SQL text.
+
+```lua
+LibESQL.Update("kills", { secs = 55 }, "boss = ? AND secs > ?", { "Zaan", 55 })
+LibESQL.Update("kills", { note = LibESQL.NULL })          -- every row
+```
+
+### LibESQL.Delete(tableName, where, whereParams)
+
+- **Arguments:**
+  - `tableName`: string
+  - `where`: optional SQL condition text. Leave it out to delete every row (the table itself stays).
+  - `whereParams`: optional values for the `?` placeholders in `where`
+- **Returns:** the number of rows removed (0 when nothing matched), or `nil, errorText`. It is an error when there is no such table, the table is read-only, or `where` isn't valid SQL.
+- **Fires:** `RowsDeleted`.
+- **Same as** `DELETE FROM tableName WHERE where`.
+
+```lua
+LibESQL.Delete("kills", "at < ?", { GetTimeStamp() - 7 * 86400 })   -- older than a week
+LibESQL.Delete("kills")                                             -- empty the table
+```
+
+### LibESQL.DropTable(name)
+
+- **Returns:** `true`, or `nil, errorText` for unknown or built-in tables.
+- **Same as** `DROP TABLE name`.
+
+---
+
 ## Schema
 
 ### LibESQL.GetTableNames()
@@ -205,7 +293,7 @@ Adds a table (or replaces one with the same name), which then works in every que
 
 - **Arguments:** a [table definition](#table-definition).
 - **Returns:** the definition.
-- **Raises** when a column name appears twice.
+- **Raises** when a column name appears twice, or when `name` is a built-in table (built-in tables can't be replaced).
 
 ```lua
 LibESQL.RegisterTable({
@@ -319,8 +407,11 @@ Caps:
 | `Loaded` | none | LibESQL's SavedVariables are ready (`LibESQL.loaded` is now `true`). |
 | `ScanProgress` | `tableName, fraction, idsFound` | At 0, at every 10% step and at 1 during an id scan. |
 | `ScanDone` | `tableName, count` | An id scan finished. |
-| `UserTableCreated` | `name` | `SELECT ... INTO name` created or replaced a table. |
+| `UserTableCreated` | `name` | `CREATE TABLE name` created a table, or `SELECT ... INTO name` created or replaced one. |
 | `UserTableDropped` | `name` | `DROP TABLE name`. |
+| `RowsInserted` | `tableName, count` | `INSERT` or `LibESQL.Insert` added rows. |
+| `RowsUpdated` | `tableName, count` | `UPDATE` or `LibESQL.Update` finished. `count` is the number of rows changed, and can be 0. |
+| `RowsDeleted` | `tableName, count` | `DELETE` or `LibESQL.Delete` finished. `count` is the number of rows removed, and can be 0. |
 
 `LibESQL.FireCallbacks(event, ...)` fires an event. Add-ons can use it for events of their own.
 
@@ -354,6 +445,9 @@ LibESQL does long work in coroutines driven by `EVENT_MANAGER:RegisterForUpdate`
 | `LibESQL.EnumRange(prefix, lo, hi)` | lo, hi | The `prefix..MIN_VALUE` / `MAX_VALUE` (or `ITERATION_BEGIN/END`) of an enum, or the fallbacks you pass. |
 | `LibESQL.GlobalPairs()` | iterator | A safe `pairs(_G)` that uses `zo_insecurePairs` and skips the game's private functions. |
 | `LibESQL.NowMs()` | number | `GetGameTimeMilliseconds()`. |
+| `LibESQL.IsBuiltinTable(name)` | boolean | Whether a table comes with LibESQL (and so is always read-only). |
+| `LibESQL.CheckWritable(def, action)` | `"user"` or `"handler"` | The check every write goes through (`action` is `"INSERT"`, `"UPDATE"` or `"DELETE"`). It raises an engine error when the table can't be written to. |
+| `LibESQL.NULL` | sentinel | Stands for SQL `NULL` where Lua can't store `nil`, for example in `Update` changes. |
 | `LibESQL.AbilityName(id)` | string or nil | Clean ability name, `nil` if empty. |
 | `LibESQL.ItemLink(id)` | string | A base item link for an item id. |
 
@@ -391,7 +485,7 @@ These are for tools and other UIs. Most add-ons don't need them.
 | `LibESQL.budget` | 3000 | 700 | Units of work per job per frame |
 | `LibESQL.COMBAT_LOG_MAX` | 30000 | 5000 | Combat events kept |
 | `LibESQL.EFFECTS_SEEN_MAX` | 20000 | 3000 | Distinct effect ids remembered |
-| `LibESQL.USER_TABLE_MAX_ROWS` | 50000 | 5000 | Rows allowed in `SELECT ... INTO` |
+| `LibESQL.USER_TABLE_MAX_ROWS` | 50000 | 5000 | Rows allowed in one user table (`SELECT ... INTO` or `INSERT`) |
 
 You can change `budget` at run time. A lower value gives smoother frames and slower queries.
 
@@ -405,7 +499,7 @@ You can change `budget` at run time. A lower value gives smoother frames and slo
 |---|---|
 | `scans[table]` | `{ api, ranges, count, maxId }`. `ranges` is a compact base-36 string of id runs. |
 | `effectsSeen[abilityId]` | `{ timesSeen, lastSeenTimestamp, flags, maxStacks, effectType, abilityType, statusEffectType }`. The `flags` bits are 1 = on you, 2 = on others, 4 = applied by you. |
-| `userTables[name]` | `{ columns = {...}, rows = { {v1, v2, ...}, ... }, desc }`, from `SELECT ... INTO` |
+| `userTables[name]` | `{ columns = {...}, types = {...}, rows = { {v1, v2, ...}, ... }, desc }`, from `CREATE TABLE`, `INSERT` and `SELECT ... INTO` |
 | `trackEffects` | boolean |
 
 ---
@@ -420,7 +514,12 @@ You can change `budget` at run time. A lower value gives smoother frames and slo
 | `SELECT ... INTO name FROM ...` | Rows. The result is also saved as user table `name`, replacing any user table with that name. Column names are lower-cased, and repeated names get `_2`, `_3`... You can't overwrite a built-in table. |
 | `SHOW TABLES` | `name, kind, description` for every table |
 | `DESCRIBE t` / `DESC t` | `column_name, type, description` |
-| `DROP TABLE t` | Removes a user table. Built-in tables can't be dropped. |
+| `CREATE TABLE [IF NOT EXISTS] t (col [type], ...)` | Creates an empty user table. The types are `INT`/`INTEGER`/`BIGINT`/`SMALLINT`, `REAL`/`FLOAT`/`DOUBLE`/`NUMBER`/`NUMERIC`/`DECIMAL`, `TEXT`/`STRING`/`VARCHAR`/`CHAR` and `BOOL`/`BOOLEAN`. Sizes such as `VARCHAR(40)` are accepted and ignored. A missing or unknown type means `any`. |
+| `INSERT INTO t [(col, ...)] VALUES (v, ...) [, (v, ...)]` | Adds rows. Values can be any constant expression, `?`, a function, or a `(SELECT ...)`. Without a column list, each row must give every column in order. |
+| `INSERT INTO t [(col, ...)] SELECT ...` | Adds the rows a query returns, matched to the columns by position. |
+| `UPDATE t [[AS] alias] SET col = expr [, col = expr ...] [WHERE cond]` | Changes the rows where `cond` is true, or every row without `WHERE`. `SET` expressions and `WHERE` can use the row's columns (`SET secs = secs - 1`), `?` and subqueries. Every `SET` is computed from the row as it was before the update, and a column can be set only once per statement. `SET t.col = ...` is accepted. |
+| `DELETE FROM t [[AS] alias] [WHERE cond]` | Removes the rows where `cond` is true, or every row without `WHERE`. The table itself stays; use `DROP TABLE` to remove it. `WHERE` can use the row's columns, `?` and subqueries, and is checked for every row before any row is removed. |
+| `DROP TABLE t` | Removes a user table. Built-in tables and other add-ons' tables can't be dropped. |
 | `REFRESH t` / `REFRESH ALL` | Clears cached rows. |
 | `SCAN abilities` / `SCAN items` | Rebuilds the id index (always a fresh scan). |
 | `HELP` | A short syntax summary, one line per row. |
@@ -1436,6 +1535,8 @@ Kind: **live**  ·  Key: `name`
 | `num_columns` | int | Column count |
 | `key` | text | Primary key column |
 | `rows_cached` | int | Rows in memory or ids indexed (NULL until first use) |
+| `builtin` | bool | Comes with LibESQL; always read-only |
+| `writable` | bool | INSERT / UPDATE / DELETE allowed (tables you created) |
 
 ### columns
 

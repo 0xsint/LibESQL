@@ -16,7 +16,7 @@ The **ESQL** add-on is the window and console panel built on this library. You d
 
 ## Examples
 
-[LibESQL-Examples](../LibESQL-Examples/README.md) has ten ready-to-install example add-ons:
+[LibESQL-Examples](../LibESQL-Examples/README.md) has eleven ready-to-install example add-ons:
 - query basics
 - ability lookup
 - set search
@@ -26,6 +26,7 @@ The **ESQL** add-on is the window and console panel built on this library. You d
 - your own function
 - scan progress
 - collection report
+- saved data (a to-do list using CREATE TABLE, INSERT, UPDATE and DELETE)
 - a console settings panel
 
 ## Install
@@ -67,6 +68,11 @@ end)
 | `LibESQL.ToObjects(result)` | The rows of a result as objects. |
 | `LibESQL.Quote(value)` | The value as an SQL literal: `Kinras's` becomes `'Kinras''s'`, `nil` becomes `NULL`. |
 | `LibESQL.Validate(sql)` | `true`, or `false, errorText`. Parses the SQL without running it. |
+| `LibESQL.CreateTable(name, columns, ifNotExists?)` | Creates a table you can insert into: `{ "boss TEXT", "secs REAL" }`. Returns `true`, `false` if it already existed (with `ifNotExists`), or `nil, errorText`. |
+| `LibESQL.Insert(table, row or rows)` | Inserts `{ boss = "Zaan", secs = 61 }` or an array of such rows. Returns the count or `nil, errorText`. |
+| `LibESQL.Update(table, changes, where?, whereParams?)` | Updates rows: `Update("kills", { secs = 50 }, "boss = ?", { "Zaan" })`. Leave out `where` to update every row, and use `LibESQL.NULL` to set a column to NULL. Returns the number of rows changed or `nil, errorText`. |
+| `LibESQL.Delete(table, where?, whereParams?)` | Deletes rows: `Delete("kills", "boss = ?", { "Zaan" })`. Leave out `where` to delete every row (the table stays). Returns the number of rows removed or `nil, errorText`. |
+| `LibESQL.DropTable(name)` | Drops one of your tables. Returns `true` or `nil, errorText`. |
 | `LibESQL.RegisterTable(def)` | Adds your own table (see below). |
 | `LibESQL.RegisterFunction(name, fn)` | Adds an SQL function. |
 | `LibESQL.GetTableNames()` | Every table name. |
@@ -102,6 +108,9 @@ A lookup by primary key, such as `WHERE id = 123` or `WHERE id IN (1, 2, 3)`, ne
 | `ScanDone` | `tableName, count` |
 | `UserTableCreated` | `name` |
 | `UserTableDropped` | `name` |
+| `RowsInserted` | `tableName, count` |
+| `RowsUpdated` | `tableName, count` |
+| `RowsDeleted` | `tableName, count` |
 
 ## Your own tables
 
@@ -133,6 +142,30 @@ LibESQL.Query("SELECT boss, MAX(dps) FROM my_parses GROUP BY boss ORDER BY 2 DES
 - Column types are `int`, `num`, `text` and `bool`.
 - Inside `build`, call `LibESQL.Tick()` in loops. Don't call it inside `pcall`, a metamethod or a `table.sort` comparator.
 
+## Saving your own data
+
+```lua
+LibESQL.Query("CREATE TABLE IF NOT EXISTS kills (boss TEXT, secs REAL, at INT)")
+LibESQL.Query("INSERT INTO kills VALUES (?, ?, ?)", { params = { "Zaan", 61.5, GetTimeStamp() } })
+LibESQL.Insert("kills", { boss = "Nirn", secs = 48, at = GetTimeStamp() })   -- same thing from Lua
+
+LibESQL.Query("UPDATE kills SET secs = ? WHERE boss = ? AND secs > ?", { params = { 55, "Zaan", 55 } })
+LibESQL.Update("kills", { secs = 55 }, "boss = ?", { "Zaan" })                -- same thing from Lua
+
+LibESQL.Query("DELETE FROM kills WHERE at < ?", { params = { GetTimeStamp() - 7 * 86400 } })
+LibESQL.Delete("kills", "at < ?", { GetTimeStamp() - 7 * 86400 })            -- same thing from Lua
+
+for _, k in ipairs(LibESQL.Select("SELECT boss, MIN(secs) AS best FROM kills GROUP BY boss")) do
+    d(k.boss .. ": " .. k.best .. "s")
+end
+```
+
+- Inserted values are converted to the column's type: `'42'` into an `INT` becomes `42`, and `'yes'` into a `BOOL` becomes `true`.
+- Columns you leave out are `NULL`.
+- `UPDATE` and `DELETE` without `WHERE` affect every row. `DELETE FROM t` empties the table but keeps it; `DROP TABLE t` removes it.
+- In `UPDATE`, the `SET` expressions can use the row's current values (`SET secs = secs - 1`), and each one is computed from the row as it was before the update.
+- Tables you register with `RegisterTable` can accept writes too: give the definition an `insert = function(row) ... end`, an `update = function(row, changes) ... end` and/or a `delete = function(row) ... end`.
+
 ## Your own SQL functions
 
 ```lua
@@ -156,9 +189,12 @@ LibESQL.Query("SELECT name, SECONDS(duration_ms) FROM abilities WHERE id = 46340
   - Names and details: `ABILITY_NAME ABILITY_DESC ABILITY_ICON ABILITY_DURATION ABILITY_LINK SET_NAME ZONE_NAME ITEM_NAME ITEM_LINK ITEM_ID COLLECTIBLE_NAME ACHIEVEMENT_NAME`
   - Text and display: `CLEAN` strips markup, `ICON(path, size)` makes texture markup, `STR(SI_x)` returns a localized string
   - Constants: `ENUM(prefix, value)` gives the name of an enum value, and `CONST(name)` gives the value of a constant
+- Writing to your own tables: `CREATE TABLE [IF NOT EXISTS] t (col INT|REAL|TEXT|BOOL, ...)`, `INSERT INTO t [(cols)] VALUES (...), (...)`, `INSERT INTO t [(cols)] SELECT ...`, `UPDATE t SET col = expr [, ...] [WHERE ...]`, `DELETE FROM t [WHERE ...]`
 - Statements: `SHOW TABLES`, `DESCRIBE t`, `DROP TABLE t` (your tables only), `REFRESH t|ALL`, `SCAN abilities|items`, `HELP`
 
-Text comparison (`=`, `<`, `ORDER BY`) and `LIKE` ignore case. `SELECT ... INTO name` saves a result as a table in `LibESQL_SV`. Console allows 5,000 rows per saved table and PC allows 50,000.
+Text comparison (`=`, `<`, `ORDER BY`) and `LIKE` ignore case. Your own tables (`CREATE TABLE`, `INSERT`, `UPDATE`, `DELETE`, `SELECT ... INTO`) are saved in `LibESQL_SV` and are there again after a reload.
+
+Every table that comes with LibESQL is built in and always read-only. It can't be written to, dropped, replaced with `RegisterTable` or overwritten by a table of yours. Only tables created after LibESQL loads can be changed: yours, and other add-ons' tables that provide their own write functions. `SELECT name, writable FROM tables` lists which ones you can write to. Console allows 5,000 rows per saved table and PC allows 50,000.
 
 ## Tables
 
@@ -180,7 +216,7 @@ Table kinds:
 - **static** tables build on first use and stay cached.
 - **live** tables are read fresh on every query.
 - **scan** tables stream rows from the saved id index.
-- **user** tables are the ones you made with `INTO`.
+- **user** tables are the ones you made with `CREATE TABLE` or `SELECT ... INTO`.
 
 ## Console notes
 

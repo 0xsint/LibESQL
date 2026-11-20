@@ -1,0 +1,8 @@
+## Title: LibESQL Example - Saved data: CREATE TABLE, INSERT, UPDATE, DELETE
+## Author: Vixen Hunny
+## Version: 1.0.0
+## APIVersion: 101049 101050
+## DependsOn: LibESQL>=10000
+## Description: Example add-on for LibESQL: a to-do list kept in a saved SQL table.
+
+LibESQL_Example_SavedData.lua

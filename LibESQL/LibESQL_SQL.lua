@@ -1,6 +1,10 @@
 -- ESQL SQL engine: tokenizer, parser, compiler and executor (pure Lua 5.1).
 --
 -- Supported:
+--   INSERT INTO t [(cols)] VALUES (...), (...) | INSERT INTO t [(cols)] SELECT ...   (your own tables)
+--   UPDATE t [alias] SET col = expr [, ...] [WHERE ...]                              (your own tables)
+--   DELETE FROM t [alias] [WHERE ...]                                                 (your own tables)
+--   CREATE TABLE [IF NOT EXISTS] t (col [INT|REAL|TEXT|BOOL], ...)
 --   SELECT [DISTINCT] expr [AS a], *, t.* [INTO new_table]
 --   FROM t [AS a] | (SELECT ...) a  [ [INNER|LEFT [OUTER]|CROSS] JOIN t2 ON ... | , t2 ]
 --   WHERE / GROUP BY / HAVING / ORDER BY expr [ASC|DESC] / LIMIT n [OFFSET m] / LIMIT m, n
@@ -185,8 +189,16 @@ function P:statement()
     elseif self:isWord("HELP") then
         self:next()
         node = { k = "help" }
+    elseif self:isWord("INSERT") then
+        node = self:insert()
+    elseif self:isWord("UPDATE") then
+        node = self:update()
+    elseif self:isWord("DELETE") then
+        node = self:delete()
+    elseif self:isWord("CREATE") then
+        node = self:createTable()
     else
-        fail("queries start with SELECT, SHOW TABLES, DESCRIBE, DROP TABLE, REFRESH, SCAN or HELP")
+        fail("queries start with SELECT, INSERT, UPDATE, DELETE, CREATE TABLE, SHOW TABLES, DESCRIBE, DROP TABLE, REFRESH, SCAN or HELP")
     end
     self:acceptOp(";")
     if self:peek().t ~= "eof" then fail("unexpected text near %s", self:near()) end
@@ -270,6 +282,108 @@ function P:select()
         end
     end
     return q
+end
+
+-- INSERT INTO t [(col, ...)] VALUES (...), (...)  |  INSERT INTO t [(col, ...)] SELECT ...
+function P:insert()
+    self:next()
+    self:expectKw("INTO")
+    local node = { k = "insert", name = lower((self:ident("a table name"))) }
+    if self:isOp("(") and not self:isKw("SELECT", 1) then
+        self:next()
+        node.cols = {}
+        repeat node.cols[#node.cols + 1] = lower((self:ident("a column name"))) until not self:acceptOp(",")
+        self:expectOp(")")
+    end
+    if self:isWord("VALUES") then
+        self:next()
+        node.values = {}
+        repeat
+            self:expectOp("(")
+            local tuple = {}
+            repeat tuple[#tuple + 1] = self:expr() until not self:acceptOp(",")
+            self:expectOp(")")
+            node.values[#node.values + 1] = tuple
+        until not self:acceptOp(",")
+    elseif self:isKw("SELECT") then
+        node.query = self:select()
+    elseif self:isOp("(") and self:isKw("SELECT", 1) then
+        self:next()
+        node.query = self:select()
+        self:expectOp(")")
+    else
+        fail("expected VALUES (...) or SELECT after INSERT INTO %s near %s", node.name, self:near())
+    end
+    return node
+end
+
+-- UPDATE t [AS alias] SET col = expr [, col = expr] [WHERE cond]
+function P:update()
+    self:next()
+    local name = lower((self:ident("a table name")))
+    local node = { k = "update", name = name, alias = name, sets = {} }
+    if self:acceptKw("AS") then
+        node.alias = lower((self:ident("an alias")))
+    elseif self:peek().t == "id" and not self:isWord("SET") then
+        node.alias = lower(self:next().v)
+    end
+    if not self:isWord("SET") then fail("expected SET after UPDATE %s near %s", name, self:near()) end
+    self:next()
+    repeat
+        local colTok = self:peek()
+        local col = self:ident("a column name")
+        -- allow SET t.col = ...
+        if self:acceptOp(".") then col = self:ident("a column name") end
+        local eq = self:peek()
+        if not (eq.t == "op" and eq.v == "=") then fail("expected '=' after SET %s near %s", col, self:near()) end
+        self:next()
+        node.sets[#node.sets + 1] = { col = lower(col), expr = self:expr(), tok = colTok }
+    until not self:acceptOp(",")
+    if self:acceptKw("WHERE") then node.where = self:expr() end
+    return node
+end
+
+-- DELETE FROM t [[AS] alias] [WHERE cond]
+function P:delete()
+    self:next()
+    self:expectKw("FROM")
+    local name = lower((self:ident("a table name")))
+    local node = { k = "delete", name = name, alias = name }
+    if self:acceptKw("AS") then
+        node.alias = lower((self:ident("an alias")))
+    elseif self:peek().t == "id" then
+        node.alias = lower(self:next().v)
+    end
+    if self:acceptKw("WHERE") then node.where = self:expr() end
+    return node
+end
+
+-- CREATE TABLE [IF NOT EXISTS] t (col [type], ...)
+function P:createTable()
+    self:next()
+    if not self:isWord("TABLE") then fail("expected CREATE TABLE name (columns)") end
+    self:next()
+    local node = { k = "create", cols = {} }
+    if self:isWord("IF") then
+        self:next(); self:expectKw("NOT"); self:expectKw("EXISTS")
+        node.ifNotExists = true
+    end
+    node.name = lower((self:ident("a table name")))
+    self:expectOp("(")
+    repeat
+        local col = { name = lower((self:ident("a column name"))) }
+        if self:peek().t == "id" then
+            col.type = lower(self:next().v)
+            if self:acceptOp("(") then
+                -- VARCHAR(40), DECIMAL(10, 2): sizes are accepted and ignored
+                repeat self:intLiteral("a type size") until not self:acceptOp(",")
+                self:expectOp(")")
+            end
+        end
+        node.cols[#node.cols + 1] = col
+    until not self:acceptOp(",")
+    self:expectOp(")")
+    return node
 end
 
 function P:intLiteral(what)
@@ -1748,6 +1862,9 @@ local HELP = {
     "SELECT cols FROM table [JOIN t2 ON ...] [WHERE ...] [GROUP BY ...] [HAVING ...] [ORDER BY ... DESC] [LIMIT n]",
     "SHOW TABLES  |  DESCRIBE table  |  SCAN abilities|items  |  REFRESH table|ALL  |  DROP TABLE name",
     "SELECT ... INTO name FROM ...  saves the result as a table you can query later",
+    "CREATE TABLE notes (id INT, text TEXT)  |  INSERT INTO notes VALUES (1, 'hi'), (2, 'yo')  |  INSERT INTO notes (id) SELECT ...",
+    "UPDATE notes SET text = 'done', id = id + 100 WHERE id = 1   (no WHERE = every row)",
+    "DELETE FROM notes WHERE id > 100   (no WHERE = every row; DROP TABLE removes the table itself)",
     "Text matching is case-insensitive.  LIKE '%fire%'   MATCH(name, 'Lua pattern')",
     "Functions: LOWER UPPER LENGTH SUBSTR REPLACE INSTR CONTAINS TRIM ROUND ABS COALESCE IIF CASE CAST PRINTF CLEAN ICON ENUM",
     "Game lookups: ABILITY_NAME(id) ABILITY_DESC(id) ABILITY_ICON(id) SET_NAME(id) ZONE_NAME(id) ITEM_NAME(id) ITEM_LINK(id) COLLECTIBLE_NAME(id)",
@@ -1761,7 +1878,140 @@ SQL.HELP = HELP
 local function messageResult(lines)
     local rows = {}
     for i, l in ipairs(lines) do rows[i] = { l } end
-    return { columns = { "info" }, rows = rows, elapsedMs = 0 }
+    return { columns = { "info" }, rows = rows, elapsedMs = 0, message = lines[1] }
+end
+
+-- UPDATE: SET expressions and WHERE see the row as it was before the change.
+function SQL.ExecuteUpdate(stmt)
+    local t0 = E.NowMs()
+    local def = E.GetTable(stmt.name)
+    if not def then fail("no table '%s'", stmt.name) end
+    E.CheckWritable(def, "UPDATE")
+    local src = makeSource({ name = stmt.name, alias = stmt.alias })
+    local cc = { sources = { src } }
+
+    local sets, seen = {}, {}
+    for i, s in ipairs(stmt.sets) do
+        local col = def.colIndex[s.col]
+        if not col then
+            local names = {}
+            for j, c in ipairs(def.columns) do names[j] = c.name end
+            fail("table %s has no column '%s'. Columns: %s", def.name, s.col, table.concat(names, ", "))
+        end
+        if seen[col.key] then fail("column '%s' is set twice", col.key) end
+        seen[col.key] = true
+        sets[i] = { key = col.key, fn = compile(s.expr, cc) }
+    end
+    local where = stmt.where and compile(stmt.where, cc)
+
+    local rows = def.kind == "user" and def.rows or E.GetRows(def)
+    local updates = {}
+    local ctx = {}
+    for _, row in ipairs(rows) do
+        Tick()
+        ctx[1] = row
+        if not where or truth(where(ctx)) == true then
+            local changes = {}
+            for _, s in ipairs(sets) do
+                local v = s.fn(ctx)
+                if v == nil then v = E.NULL end
+                changes[s.key] = v
+            end
+            updates[#updates + 1] = { row = row, changes = changes }
+        end
+    end
+
+    local n = E.UpdateRows(def, updates)
+    local res = messageResult({ format("Updated %d row%s in %s", n, n == 1 and "" or "s", def.name) })
+    res.elapsedMs = E.NowMs() - t0
+    res.rowsAffected = n
+    return res
+end
+
+-- DELETE: WHERE is evaluated for every row first, then the matches are removed.
+function SQL.ExecuteDelete(stmt)
+    local t0 = E.NowMs()
+    local def = E.GetTable(stmt.name)
+    if not def then fail("no table '%s'", stmt.name) end
+    E.CheckWritable(def, "DELETE")
+    local src = makeSource({ name = stmt.name, alias = stmt.alias })
+    local where = stmt.where and compile(stmt.where, { sources = { src } })
+
+    local rows = def.kind == "user" and def.rows or E.GetRows(def)
+    local doomed, ctx = {}, {}
+    for _, row in ipairs(rows) do
+        Tick()
+        ctx[1] = row
+        if not where or truth(where(ctx)) == true then doomed[#doomed + 1] = row end
+    end
+
+    local n = E.DeleteRows(def, doomed)
+    local res = messageResult({ format("Deleted %d row%s from %s", n, n == 1 and "" or "s", def.name) })
+    res.elapsedMs = E.NowMs() - t0
+    res.rowsAffected = n
+    return res
+end
+
+local function executeInsert(stmt)
+    local t0 = E.NowMs()
+    local def = E.GetTable(stmt.name)
+    if not def then
+        fail("no table '%s'. Create it first: CREATE TABLE %s (col1 TEXT, col2 INT, ...)", stmt.name, stmt.name)
+    end
+    E.CheckWritable(def, "INSERT")
+
+    -- target columns
+    local targets = {}
+    if stmt.cols then
+        local seen = {}
+        for i, name in ipairs(stmt.cols) do
+            local col = def.colIndex[name]
+            if not col then
+                local names = {}
+                for j, c in ipairs(def.columns) do names[j] = c.name end
+                fail("table %s has no column '%s'. Columns: %s", def.name, name, table.concat(names, ", "))
+            end
+            if seen[name] then fail("column '%s' is listed twice", name) end
+            seen[name] = true
+            targets[i] = col.key
+        end
+    else
+        for i, c in ipairs(def.columns) do targets[i] = c.key end
+    end
+    local width = #targets
+
+    local objs = {}
+    local function addRow(values, n)
+        if n ~= width then
+            fail("%s expects %d value%s per row but got %d", stmt.cols and "the column list" or ("table " .. def.name),
+                width, width == 1 and "" or "s", n)
+        end
+        local obj = {}
+        for i = 1, width do obj[targets[i]] = values[i] end
+        objs[#objs + 1] = obj
+    end
+
+    if stmt.values then
+        local cc = { sources = {} }
+        for _, tuple in ipairs(stmt.values) do
+            Tick()
+            local vals = {}
+            for i, node in ipairs(tuple) do vals[i] = compile(node, cc)({}) end
+            addRow(vals, #tuple)
+        end
+    else
+        local res = SQL.ExecuteSelect(stmt.query, { inner = true })
+        for _, row in ipairs(res.rows) do
+            Tick()
+            addRow(row, #res.columns)
+        end
+    end
+
+    local n = E.InsertRows(def, objs)
+    local res = messageResult({ format("Inserted %d row%s into %s", n, n == 1 and "" or "s", def.name) })
+    res.elapsedMs = E.NowMs() - t0
+    res.rowsAffected = n
+    return res
 end
 
 function SQL.ExecuteStatement(stmt, opts)
@@ -1789,6 +2039,15 @@ function SQL.ExecuteStatement(stmt, opts)
         return messageResult({ format("%s: indexed %d ids", name, count) })
     elseif k == "help" then
         return messageResult(HELP)
+    elseif k == "insert" then
+        return executeInsert(stmt)
+    elseif k == "update" then
+        return SQL.ExecuteUpdate(stmt)
+    elseif k == "delete" then
+        return SQL.ExecuteDelete(stmt)
+    elseif k == "create" then
+        local _, created = E.CreateEmptyUserTable(stmt.name, stmt.cols, stmt.ifNotExists)
+        return messageResult({ created and format("Created table %s", stmt.name) or format("Table %s already exists", stmt.name) })
     end
     fail("unknown statement")
 end

@@ -37,6 +37,14 @@ local EXAMPLES = {
     "SELECT name, value FROM constants WHERE family = 'ACTION_RESULT' ORDER BY value",
     "SELECT name, zone, type FROM pois WHERE type = 'group_dungeon' ORDER BY zone",
     "SELECT stat, value, base FROM stats ORDER BY stat",
+    -- your own saved tables
+    "CREATE TABLE IF NOT EXISTS notes (id INT, note TEXT, done BOOL)",
+    "INSERT INTO notes VALUES ((SELECT COALESCE(MAX(id), 0) + 1 FROM notes), 'Farm Kinras''s Wrath', FALSE)",
+    "SELECT * FROM notes ORDER BY done, id",
+    "UPDATE notes SET done = TRUE WHERE id = 1",
+    "DELETE FROM notes WHERE done",
+    "CREATE TABLE IF NOT EXISTS wishlist (set_name TEXT, piece TEXT)",
+    "INSERT INTO wishlist SELECT set_name, name FROM set_pieces WHERE set_name LIKE '%kinras%' AND NOT unlocked",
 }
 UI.EXAMPLES = EXAMPLES
 UI.exampleIndex = 0
@@ -146,6 +154,7 @@ local function button(parent, name, text, width, onClick)
     local l = label(b, name .. "Text", S.buttonFont, true, text)
     l:SetAnchor(CENTER, b, CENTER, 0, 0)
     l:SetColor(0.95, 0.95, 0.95, 1)
+    b.label = l
     b:SetHandler("OnMouseEnter", function() bg:SetColor(0.25, 0.48, 0.62, 1) end)
     b:SetHandler("OnMouseExit", function() bg:SetColor(0.16, 0.3, 0.4, 0.95) end)
     b:SetHandler("OnMouseUp", function(_, btn, upInside)
@@ -271,6 +280,7 @@ function UI.Create()
         addButton("Run", "Run", function() UI.Run() end)
         addButton("Stop", "Stop", function() UI.Stop() end)
         addButton("Tables", "Tables", function() UI.RunText("SHOW TABLES") end)
+        addButton("NewTable", "New table", function() UI.ShowCreateTable() end)
         addButton("Example", "Example", function() UI.NextExample() end)
         addButton("Help", "Help", function() UI.RunText("HELP") end)
         addButton("Copy", "Copy", function() UI.ShowExport() end)
@@ -375,7 +385,10 @@ function UI.SetScale(k)
     if UI.win then
         UI.win:SetHidden(true)
         if UI.exportWin then UI.exportWin:SetHidden(true) end
+        if UI.createWin then UI.createWin:SetHidden(true) end
+        UI.CloseDropdown()
         UI.win, UI.edit, UI.grid, UI.status, UI.exportWin, UI.exportEdit = nil, nil, nil, nil, nil, nil
+        UI.createWin = nil
         UI.generation = UI.generation + 1
     end
     UI.widths = nil
@@ -686,6 +699,308 @@ function UI.CopyExport()
 end
 
 ---------------------------------------------------------------------------
+-- Dropdown (built from plain controls; the game's combo box templates are
+-- keyboard-only and don't render in every UI mode)
+---------------------------------------------------------------------------
+local openList
+
+function UI.CloseDropdown()
+    if openList then openList:SetHidden(true); openList = nil end
+end
+
+-- choices: { { value = , text = }, ... }; getValue() -> current value; onSelect(value)
+local function dropdown(parent, name, width, choices, getValue, onSelect)
+    local b = button(parent, name, "", width, function() end)
+    local listW = math.max(width, floor(S.buttonFont * 14))
+    local list = WM:CreateTopLevelWindow(N(name .. "List"))
+    list:SetDrawTier(DT_HIGH)
+    list:SetDrawLayer(DL_OVERLAY or 4)
+    list:SetMouseEnabled(true)
+    list:SetClampedToScreen(true)
+    list:SetHidden(true)
+    list:SetDimensions(listW, #choices * S.buttonH)
+    local lbg = solid(list, name .. "ListBG", 0.02, 0.03, 0.05, 0.98)
+    lbg:SetAnchorFill(list)
+    local function textFor(v)
+        for _, c in ipairs(choices) do if c.value == v then return c.short or c.text end end
+        return tostring(v or "")
+    end
+    function b.Refresh() b.label:SetText(textFor(getValue()) .. "  v") end
+    for i, c in ipairs(choices) do
+        local opt = button(list, name .. "Opt" .. i, c.text, listW, function()
+            UI.CloseDropdown()
+            onSelect(c.value)
+            b.Refresh()
+        end)
+        opt:SetAnchor(TOPLEFT, list, TOPLEFT, 0, (i - 1) * S.buttonH)
+    end
+    b:SetHandler("OnMouseUp", function(_, btn, upInside)
+        if not upInside then return end
+        if openList == list then UI.CloseDropdown(); return end
+        UI.CloseDropdown()
+        list:ClearAnchors()
+        list:SetAnchor(TOPLEFT, b, BOTTOMLEFT, 0, 2)
+        list:SetHidden(false)
+        openList = list
+        if PlaySound and SOUNDS then PlaySound(SOUNDS.DEFAULT_CLICK) end
+    end)
+    b.Refresh()
+    return b
+end
+UI.Dropdown = dropdown
+
+---------------------------------------------------------------------------
+-- Create Table dialog (PC): name + one row per column with a type dropdown
+---------------------------------------------------------------------------
+local MAX_NEW_COLUMNS = 12
+
+-- an edit box with the same click-to-focus fix as the query box
+local function inputBox(parent, name, width, defaultText, onChange)
+    local bg = solid(parent, name .. "BG", 0, 0, 0, 0.85)
+    bg:SetDimensions(width, S.editH)
+    bg:SetMouseEnabled(true)
+    local edit = WM:CreateControl(N(name), parent, CT_EDITBOX)
+    edit:SetAnchor(TOPLEFT, bg, TOPLEFT, 6, 0)
+    edit:SetAnchor(BOTTOMRIGHT, bg, BOTTOMRIGHT, -6, 0)
+    edit:SetFont(font(S.editFont, false))
+    edit:SetColor(1, 1, 1, 1)
+    edit:SetMaxInputChars(40)
+    edit:SetMouseEnabled(true)
+    edit:SetDrawLevel(3)
+    if edit.SetVirtualKeyboardType then edit:SetVirtualKeyboardType(VIRTUAL_KEYBOARD_TYPE_DEFAULT or 0) end
+    if defaultText then edit:SetDefaultText(defaultText) end
+    local catcher = WM:CreateControl(N(name .. "Click"), parent, CT_CONTROL)
+    catcher:SetAnchorFill(bg)
+    catcher:SetMouseEnabled(true)
+    catcher:SetDrawLevel(4)
+    catcher:SetHandler("OnMouseDown", function() catcher:SetHidden(true); edit:TakeFocus() end)
+    edit:SetHandler("OnFocusGained", function() catcher:SetHidden(true); bg:SetColor(0.05, 0.12, 0.18, 0.95) end)
+    edit:SetHandler("OnFocusLost", function() catcher:SetHidden(false); bg:SetColor(0, 0, 0, 0.85) end)
+    edit:SetHandler("OnEscape", function(self) self:LoseFocus() end)
+    edit:SetHandler("OnEnter", function(self) self:LoseFocus() end)
+    if onChange then edit:SetHandler("OnTextChanged", function(self) onChange(self:GetText()) end) end
+    return bg, edit
+end
+
+local function typeChoices()
+    local out = {}
+    for i, t in ipairs(E.Console.TYPE_CHOICES) do
+        out[i] = { value = t.value, short = t.value, text = t.value .. "  |c9AA4B0" .. t.hint .. "|r" }
+    end
+    return out
+end
+
+local function newModel() return { name = "", cols = { { name = "", type = "TEXT" } } } end
+
+-- the Columns line ("id INT, note TEXT") from the dialog rows; empty names are skipped
+function UI.CreateColumnsText()
+    local parts = {}
+    for _, c in ipairs(UI.newTable.cols) do
+        local n = (c.name or ""):gsub("^%s+", ""):gsub("%s+$", "")
+        if n ~= "" then parts[#parts + 1] = E.Console.ColumnSpec(n, c.type) end
+    end
+    return table.concat(parts, ", ")
+end
+
+local function updateCreatePreview()
+    local d = UI.createDialog
+    if not d then return end
+    local cols = UI.CreateColumnsText()
+    local text
+    if (UI.newTable.name or "") == "" and cols == "" then
+        text = "Name the table, add columns and pick their types."
+    else
+        local sql, err = E.Console.BuildCreateSQL(UI.newTable.name, cols)
+        text = sql and ("|c7FD67FWill run:|r " .. sql) or ("|cFF6666" .. err .. "|r")
+    end
+    d.preview:SetText(text)
+end
+
+local function layoutCreate()
+    local d = UI.createDialog
+    local m = UI.newTable
+    for i = 1, MAX_NEW_COLUMNS do
+        local row = d.rows[i]
+        local c = m.cols[i]
+        row:SetHidden(c == nil)
+        if c then
+            d.suppress = true
+            if row.edit:GetText() ~= (c.name or "") then row.edit:SetText(c.name or "") end
+            d.suppress = false
+            row.type.Refresh()
+        end
+    end
+    if d.nameEdit:GetText() ~= (m.name or "") then
+        d.suppress = true; d.nameEdit:SetText(m.name or ""); d.suppress = false
+    end
+    d.template.Refresh()
+    local n = #m.cols
+    local y = d.rowsTop + n * (S.editH + 6) + 4
+    d.addCol:ClearAnchors()
+    d.addCol:SetAnchor(TOPLEFT, d.win, TOPLEFT, S.pad, y)
+    d.addCol:SetHidden(n >= MAX_NEW_COLUMNS)
+    y = y + S.buttonH + 10
+    d.preview:ClearAnchors()
+    d.preview:SetAnchor(TOPLEFT, d.win, TOPLEFT, S.pad, y)
+    d.preview:SetWidth(d.width - 2 * S.pad)
+    y = y + 2 * (S.statusFont + 8) + 8
+    d.createBtn:ClearAnchors()
+    d.createBtn:SetAnchor(TOPLEFT, d.win, TOPLEFT, S.pad, y)
+    d.win:SetHeight(y + S.buttonH + S.pad)
+    updateCreatePreview()
+end
+
+local function buildCreateDialog()
+    local C = E.Console
+    local W = floor(math.min(GuiRoot:GetWidth() * 0.9, 820 * S.k))
+    local win = WM:CreateTopLevelWindow(N("Create"))
+    win:SetDimensions(W, 400)
+    win:SetAnchor(CENTER, GuiRoot, CENTER, 0, 0)
+    win:SetMovable(true); win:SetMouseEnabled(true); win:SetClampedToScreen(true)
+    win:SetDrawTier(DT_HIGH)
+    win:SetHidden(true)
+    local bg = solid(win, "CreateBG", 0.04, 0.05, 0.07, 0.97)
+    bg:SetAnchorFill(win)
+    local accent = solid(win, "CreateAccent", 0.31, 0.76, 0.97, 1)
+    accent:SetAnchor(TOPLEFT, win, TOPLEFT, 0, 0)
+    accent:SetAnchor(TOPRIGHT, win, TOPRIGHT, 0, 0)
+    accent:SetHeight(3)
+
+    local d = { win = win, width = W, rows = {} }
+    UI.createDialog = d
+    local pad = S.pad
+    local labelW = floor(S.buttonFont * 7)
+
+    local title = label(win, "CreateTitle", S.titleFont, true, "Create a table")
+    title:SetAnchor(TOPLEFT, win, TOPLEFT, pad, pad * 0.6)
+    local close = button(win, "CreateClose", "X", S.buttonH, function() UI.HideCreateTable() end)
+    close:SetAnchor(TOPRIGHT, win, TOPRIGHT, -pad * 0.6, pad * 0.6)
+
+    -- template
+    local y = pad * 0.6 + S.buttonH + pad * 0.6
+    local tl = label(win, "CreateTplLabel", S.cellFont, false, "Start from")
+    tl:SetAnchor(TOPLEFT, win, TOPLEFT, pad, y + 6)
+    local tplChoices = {}
+    for i, t in ipairs(C.TEMPLATES) do tplChoices[i] = { value = i, text = t.name } end
+    d.template = dropdown(win, "CreateTpl", floor(S.buttonFont * 14), tplChoices,
+        function() return UI.newTable.template end,
+        function(i)
+            local t = C.TEMPLATES[i]
+            UI.newTable = { name = t.table, cols = {}, template = i }
+            local parsed = C.ParseColumns(t.cols) or {}
+            for k, c in ipairs(parsed) do UI.newTable.cols[k] = { name = c.name, type = c.type or "ANY" } end
+            if #UI.newTable.cols == 0 then UI.newTable.cols[1] = { name = "", type = "TEXT" } end
+            layoutCreate()
+        end)
+    d.template:SetAnchor(TOPLEFT, win, TOPLEFT, pad + labelW, y)
+
+    -- table name
+    y = y + S.buttonH + 10
+    local nl = label(win, "CreateNameLabel", S.cellFont, false, "Table name")
+    nl:SetAnchor(TOPLEFT, win, TOPLEFT, pad, y + 8)
+    local nameBox, nameEdit = inputBox(win, "CreateName", W - 2 * pad - labelW, "for example my_notes", function(text)
+        if d.suppress then return end
+        UI.newTable.name = text
+        updateCreatePreview()
+    end)
+    nameBox:SetAnchor(TOPLEFT, win, TOPLEFT, pad + labelW, y)
+    d.nameEdit = nameEdit
+
+    -- column header
+    y = y + S.editH + 12
+    local typeW = floor(S.buttonFont * 8)
+    local removeW = S.buttonH
+    local nameW = W - 2 * pad - typeW - removeW - 16
+    local h1 = label(win, "CreateColHead", S.headFont, true, "Column")
+    h1:SetColor(0.45, 0.82, 1, 1)
+    h1:SetAnchor(TOPLEFT, win, TOPLEFT, pad, y)
+    local h2 = label(win, "CreateTypeHead", S.headFont, true, "Type")
+    h2:SetColor(0.45, 0.82, 1, 1)
+    h2:SetAnchor(TOPLEFT, win, TOPLEFT, pad + nameW + 8, y)
+    d.rowsTop = y + S.headFont + 10
+
+    -- column rows (created once, shown as needed)
+    local choices = typeChoices()
+    for i = 1, MAX_NEW_COLUMNS do
+        local row = WM:CreateControl(N("CreateRow" .. i), win, CT_CONTROL)
+        row:SetDimensions(W - 2 * pad, S.editH)
+        row:SetAnchor(TOPLEFT, win, TOPLEFT, pad, d.rowsTop + (i - 1) * (S.editH + 6))
+        local box, edit = inputBox(row, "CreateCol" .. i, nameW, i == 1 and "column name, e.g. note" or "column name", function(text)
+            if d.suppress then return end
+            local c = UI.newTable.cols[i]
+            if c then c.name = text end
+            updateCreatePreview()
+        end)
+        box:SetAnchor(TOPLEFT, row, TOPLEFT, 0, 0)
+        row.edit = edit
+        row.type = dropdown(row, "CreateType" .. i, typeW, choices,
+            function() local c = UI.newTable.cols[i]; return c and c.type end,
+            function(v)
+                local c = UI.newTable.cols[i]
+                if c then c.type = v end
+                updateCreatePreview()
+            end)
+        row.type:SetAnchor(TOPLEFT, row, TOPLEFT, nameW + 8, floor((S.editH - S.buttonH) / 2))
+        local rm = button(row, "CreateRm" .. i, "X", removeW, function()
+            UI.CloseDropdown()
+            table.remove(UI.newTable.cols, i)
+            if #UI.newTable.cols == 0 then UI.newTable.cols[1] = { name = "", type = "TEXT" } end
+            layoutCreate()
+        end)
+        rm:SetAnchor(TOPLEFT, row, TOPLEFT, nameW + 8 + typeW + 8, floor((S.editH - S.buttonH) / 2))
+        d.rows[i] = row
+    end
+
+    d.addCol = button(win, "CreateAddCol", "+ Add column", floor(S.buttonFont * 9), function()
+        UI.CloseDropdown()
+        if #UI.newTable.cols < MAX_NEW_COLUMNS then
+            UI.newTable.cols[#UI.newTable.cols + 1] = { name = "", type = "TEXT" }
+            layoutCreate()
+            local row = d.rows[#UI.newTable.cols]
+            if row then row.edit:TakeFocus() end
+        end
+    end)
+
+    d.preview = label(win, "CreatePreview", S.statusFont, false, "")
+    d.preview:SetWrapMode(TEXT_WRAP_MODE_ELLIPSIS)
+    d.preview:SetMaxLineCount(2)
+
+    d.createBtn = button(win, "CreateGo", "Create", floor(S.buttonFont * 6), function() UI.CreateTableFromDialog() end)
+    local cancel = button(win, "CreateCancel", "Cancel", floor(S.buttonFont * 6), function() UI.HideCreateTable() end)
+    cancel:SetAnchor(LEFT, d.createBtn, RIGHT, 8, 0)
+
+    UI.createWin = win
+end
+
+function UI.ShowCreateTable()
+    UI.Show()
+    if not UI.newTable then UI.newTable = newModel() end
+    if not UI.createWin then buildCreateDialog() end
+    UI.createWin:SetHidden(false)
+    layoutCreate()
+end
+
+function UI.HideCreateTable()
+    UI.CloseDropdown()
+    if UI.createWin then UI.createWin:SetHidden(true) end
+end
+
+function UI.CreateTableFromDialog()
+    UI.CloseDropdown()
+    local C = E.Console
+    C.newName, C.newCols = UI.newTable.name, UI.CreateColumnsText()
+    return C.CreateFromPrompt(function(ok)
+        if ok and C.created then
+            UI.newTable = newModel()
+            UI.HideCreateTable()
+            -- ready to add the first row
+            if UI.edit and C.query then UI.edit:SetText(C.query); UI.edit:TakeFocus() end
+            UI.SetStatus(format("Created table %s. Edit the INSERT in the query box and press Run to add a row.", C.created))
+        end
+    end)
+end
+
+---------------------------------------------------------------------------
 -- Running queries
 ---------------------------------------------------------------------------
 function UI.ResultCap()
@@ -709,11 +1024,38 @@ function UI.ShowError(msg)
 end
 
 -- Run SQL text in the background and display it. onDone(ok, res) optional.
+-- UPDATE / DELETE without WHERE change every row of a table: ask first.
+-- Returns true when the caller should stop and wait for a second Run.
+local function needsConfirm(text)
+    local ok, stmt = pcall(SQL.Parse, text, setmetatable({}, { __index = function() return 0 end }))
+    if not ok or type(stmt) ~= "table" then return false end
+    if (stmt.k ~= "update" and stmt.k ~= "delete") or stmt.where then
+        UI.pendingConfirm = nil
+        return false
+    end
+    if UI.pendingConfirm == text then
+        UI.pendingConfirm = nil
+        return false
+    end
+    UI.pendingConfirm = text
+    local def = E.GetTable(stmt.name)
+    local n = def and def.rows and #def.rows
+    UI.SetStatus(format("|cFFD54FThis %s every row%s of %s. Press Run again to confirm, or add a WHERE.|r",
+        stmt.k == "delete" and "deletes" or "changes", n and format(" (%d)", n) or "", stmt.name))
+    return true
+end
+
 function UI.RunText(text, onDone)
     text = (text or ""):gsub("^%s+", ""):gsub("%s+$", "")
     if text == "" then return end
     UI.Show()
     if UI.edit and UI.edit:GetText() ~= text then UI.edit:SetText(text) end
+    if needsConfirm(text) then
+        if E.Console and E.Console.Refresh then E.Console.Refresh() end
+        -- console: the status line isn't always visible, so say it in chat too
+        if E.isConsole then E.Print("%s", E.StripMarkup(UI.statusText or "")) end
+        return
+    end
     E.sv.lastQuery = text
     UI.AddHistory(text)
     if UI.running then E.CancelJobs(); E.ResetScanFlags() end

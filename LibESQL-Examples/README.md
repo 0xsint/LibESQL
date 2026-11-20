@@ -1,6 +1,6 @@
 # LibESQL Examples
 
-Ten small add-ons that show how to use [LibESQL](../LibESQL/README.md). Each folder is a complete add-on with a manifest and one Lua file, so you can install it as is, or copy it and rename it as the start of your own add-on.
+Eleven small add-ons that show how to use [LibESQL](../LibESQL/README.md). Each folder is a complete add-on with a manifest and one Lua file, so you can install it as is, or copy it and rename it as the start of your own add-on.
 
 ## Install
 
@@ -23,6 +23,7 @@ Slash commands work on PC/Mac only. For console, start from **ConsolePanel**.
 | [CustomFunction](LibESQL_Example_CustomFunction/LibESQL_Example_CustomFunction.lua) | `/esqlfn` | `RegisterFunction`, and a join of `hotbar` with `abilities` |
 | [ScanProgress](LibESQL_Example_ScanProgress/LibESQL_Example_ScanProgress.lua) | `/esqlscan`, `/esqlscan items` | `IsScanned`, `Scan`, and the `ScanProgress` callback |
 | [CollectionReport](LibESQL_Example_CollectionReport/LibESQL_Example_CollectionReport.lua) | `/mycollection` | `GROUP BY`, `HAVING`, summing booleans, `ToObjects` |
+| [SavedData](LibESQL_Example_SavedData/LibESQL_Example_SavedData.lua) | `/todo add <text>`, `/todo`, `/todo done 1`, `/todo del 1`, `/todo clean` | A to-do list in a saved table: `CREATE TABLE IF NOT EXISTS`, `INSERT`, `UPDATE`, `DELETE`, `rowsAffected`, and NULL parameters |
 | [ConsolePanel](LibESQL_Example_ConsolePanel/LibESQL_Example_ConsolePanel.lua) | Settings > Addons > LibESQL Example | A LibHarvensAddonSettings panel with ready-made queries. It works on console. |
 
 ## Tips
@@ -30,6 +31,7 @@ Slash commands work on PC/Mac only. For console, start from **ConsolePanel**.
 - Put player text into a query with `?` parameters, never by joining strings: `LibESQL.Select("... WHERE name LIKE ?", { "%" .. text .. "%" })`.
 - The first query on `abilities` or `items` scans every id. Run it with `QueryAsync` or `Scan`. Afterwards the index is saved until the next game update.
 - `SHOW TABLES` and `DESCRIBE <table>` (or `LibESQL.GetColumns`) list what you can query.
+- Keep your add-on's own data in a table you create (see SavedData). It is saved in `LibESQL_SV` and every add-on, and the ESQL window, can query it.
 - CombatSummary turns combat logging on for every fight. Disable that example if you don't want it.
 
 ## License
