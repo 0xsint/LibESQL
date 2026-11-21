@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LibESQL API Reference</title>
+<meta name="description" content="LibESQL for Elder Scrolls Online: every function, the SQL dialect and every table.">
+<style>
+:root{--bg:#f7f8fa;--panel:#fff;--text:#1d2330;--muted:#5d6675;--line:#e2e5ea;--accent:#0b7fb3;--accent-soft:#e3f3fa;
+--code-bg:#f2f4f7;--k:#0b6fa4;--f:#8a5a00;--s:#2e7d32;--n:#b4472a;--c:#7a8391;--p:#8e44ad;--mark:#fff1a8;}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0f1318;--panel:#161b22;--text:#e2e6ec;--muted:#9aa4b2;
+--line:#2a313b;--accent:#4fc3f7;--accent-soft:#12303d;--code-bg:#1d232c;--k:#4fc3f7;--f:#ffd54f;--s:#a5d6a7;--n:#ffab91;--c:#7f8c8d;--p:#ce93d8;--mark:#5a4b00;}}
+:root[data-theme=dark]{--bg:#0f1318;--panel:#161b22;--text:#e2e6ec;--muted:#9aa4b2;--line:#2a313b;--accent:#4fc3f7;
+--accent-soft:#12303d;--code-bg:#1d232c;--k:#4fc3f7;--f:#ffd54f;--s:#a5d6a7;--n:#ffab91;--c:#7f8c8d;--p:#ce93d8;--mark:#5a4b00;}
+*{box-sizing:border-box}
+html{scroll-padding-top:16px}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+code{font:13px/1.5 ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;background:var(--code-bg);padding:.1em .35em;border-radius:4px}
+.layout{display:grid;grid-template-columns:290px minmax(0,1fr);min-height:100vh}
+nav{position:sticky;top:0;height:100vh;overflow:auto;border-right:1px solid var(--line);background:var(--panel);padding:16px 14px 40px}
+nav h1{font-size:18px;margin:0 0 2px}nav .ver{color:var(--muted);font-size:12.5px;margin-bottom:12px}
+.search{position:relative;margin-bottom:6px}
+.search input{width:100%;padding:8px 30px 8px 10px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--text);font:inherit}
+.search input:focus{outline:2px solid var(--accent);outline-offset:-1px}
+.search kbd{position:absolute;right:8px;top:8px;font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 5px}
+.count{font-size:12.5px;color:var(--muted);min-height:18px;margin-bottom:8px}
+.toc{list-style:none;margin:0;padding:0;font-size:14px}
+.toc>li{margin:1px 0}.toc a{display:block;padding:3px 8px;border-radius:5px;color:var(--text)}
+.toc a:hover{background:var(--accent-soft);text-decoration:none}.toc a.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.toc details>summary{list-style:none;cursor:pointer}.toc details>summary::-webkit-details-marker{display:none}
+.toc details>summary a{display:inline-block;width:calc(100% - 22px)}
+.toc details>summary::before{content:"\25B8";display:inline-block;width:18px;color:var(--muted);transition:transform .15s}
+.toc details[open]>summary::before{transform:rotate(90deg)}
+.toc ul{list-style:none;margin:0 0 4px 18px;padding:0;font-size:13px}.toc ul a{padding:2px 8px;color:var(--muted)}
+.toc .hide{display:none}
+.tools{display:flex;gap:6px;margin-top:14px}
+.tools button{flex:1;font:inherit;font-size:12.5px;padding:5px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text);cursor:pointer}
+main{padding:28px clamp(16px,4vw,56px) 80px;max-width:1100px}
+main h1{font-size:30px;margin:0 0 6px}main h2{font-size:23px;margin:42px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+main h3{font-size:17.5px;margin:28px 0 8px}main h4{font-size:15px}
+main h2 a.anchor,main h3 a.anchor{opacity:0;margin-left:6px;font-weight:400}main h2:hover a.anchor,main h3:hover a.anchor{opacity:.7}
+hr{border:0;border-top:1px solid var(--line);margin:28px 0}
+.table{overflow-x:auto;margin:10px 0 16px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;vertical-align:top;padding:7px 10px;border-bottom:1px solid var(--line)}
+th{background:var(--code-bg);font-weight:600;white-space:nowrap}tr:last-child td{border-bottom:0}
+td code{white-space:nowrap}td:last-child code{white-space:normal}
+.code{position:relative;margin:10px 0 16px}
+pre{margin:0;padding:14px 16px;background:var(--code-bg);border:1px solid var(--line);border-radius:8px;overflow-x:auto}
+pre code{background:none;padding:0;font-size:13px}
+.copy{position:absolute;top:7px;right:7px;font:12px system-ui,sans-serif;padding:3px 9px;border:1px solid var(--line);border-radius:5px;
+background:var(--panel);color:var(--muted);cursor:pointer;opacity:.85}.copy:hover{opacity:1;color:var(--text)}
+.k{color:var(--k);font-weight:600}.f{color:var(--f)}.s{color:var(--s)}.n{color:var(--n)}.c{color:var(--c);font-style:italic}.p{color:var(--p);font-weight:600}
+mark{background:var(--mark);color:inherit;border-radius:2px;padding:0 1px}
+.hidden{display:none!important}
+.none{display:none;color:var(--muted);padding:30px 0;font-size:16px}
+footer{margin-top:60px;color:var(--muted);font-size:13px}
+.menu{display:none}
+@media (max-width:900px){.layout{grid-template-columns:1fr}
+nav{position:fixed;z-index:5;left:0;top:0;width:86vw;max-width:330px;transform:translateX(-102%);transition:transform .2s;box-shadow:0 0 30px rgba(0,0,0,.25)}
+nav.open{transform:none}.menu{display:inline-block;position:sticky;top:8px;z-index:4;margin:8px 0 0 12px;font:inherit;padding:6px 12px;
+border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--text)}main{padding-top:10px}}
+@media print{nav,.menu,.copy{display:none}.layout{display:block}}
+</style>
+</head>
+<body>
+<button class="menu" id="menu" type="button">Contents</button>
+<div class="layout">
+<nav aria-label="Contents">
+<h1>LibESQL</h1>
+<div class="ver">API Reference &middot; 1.0.0</div>
+<div class="search"><input id="q" type="search" placeholder="Search functions, tables, columns" aria-label="Search the reference" autocomplete="off"><kbd>/</kbd></div>
+<div class="count" id="count" aria-live="polite"></div>
+<ul class="toc">
+<li><a href="#conventions">Conventions</a></li>
+<li><details><summary><a href="#data-structures">Data structures</a></summary><ul>
+<li><a href="#result">result</a></li>
+<li><a href="#opts">opts</a></li>
+<li><a href="#errors">errors</a></li>
+<li><a href="#job">job</a></li>
+<li><a href="#table-definition">table definition</a></li>
+<li><a href="#column-definition">column definition</a></li>
+</ul></details></li>
+<li><details><summary><a href="#querying">Querying</a></summary><ul>
+<li><a href="#libesqlquerysql-opts">LibESQL.Query(sql, opts)</a></li>
+<li><a href="#libesqlqueryasyncsql-callback-opts">LibESQL.QueryAsync(sql, callback, opts)</a></li>
+<li><a href="#libesqlselectsql-params">LibESQL.Select(sql, params)</a></li>
+<li><a href="#libesqlscalarsql-params">LibESQL.Scalar(sql, params)</a></li>
+<li><a href="#libesqltoobjectsresult">LibESQL.ToObjects(result)</a></li>
+<li><a href="#libesqlquotevalue">LibESQL.Quote(value)</a></li>
+<li><a href="#libesqlhighlightsql-colors">LibESQL.Highlight(sql, colors)</a></li>
+<li><a href="#libesqlescapetext-escapechar">LibESQL.Escape(text, escapeChar)</a></li>
+<li><a href="#libesqlvalidatesql">LibESQL.Validate(sql)</a></li>
+</ul></details></li>
+<li><details><summary><a href="#writing-to-your-own-tables">Writing to your own tables</a></summary><ul>
+<li><a href="#libesqlcreatetablename-columns-ifnotexists">LibESQL.CreateTable(name, columns, ifNotExists)</a></li>
+<li><a href="#libesqlinserttablename-row">LibESQL.Insert(tableName, row)</a></li>
+<li><a href="#libesqlupserttablename-rows-keycolumns">LibESQL.Upsert(tableName, rows, keyColumns)</a></li>
+<li><a href="#libesqlupdatetablename-changes-where-whereparams">LibESQL.Update(tableName, changes, where, whereParams)</a></li>
+<li><a href="#libesqldeletetablename-where-whereparams">LibESQL.Delete(tableName, where, whereParams)</a></li>
+<li><a href="#libesqldroptablename">LibESQL.DropTable(name)</a></li>
+</ul></details></li>
+<li><details><summary><a href="#schema">Schema</a></summary><ul>
+<li><a href="#libesqlgettablenames">LibESQL.GetTableNames()</a></li>
+<li><a href="#libesqlgetcolumnstablename">LibESQL.GetColumns(tableName)</a></li>
+<li><a href="#libesqlgettabletablename">LibESQL.GetTable(tableName)</a></li>
+<li><a href="#libesqlregistertabledef">LibESQL.RegisterTable(def)</a></li>
+<li><a href="#libesqlrefreshtablename">LibESQL.Refresh(tableName)</a></li>
+</ul></details></li>
+<li><details><summary><a href="#id-scans">Id scans</a></summary><ul>
+<li><a href="#libesqlscantablename-callback-force">LibESQL.Scan(tableName, callback, force)</a></li>
+<li><a href="#libesqlisscannedtablename">LibESQL.IsScanned(tableName)</a></li>
+</ul></details></li>
+<li><details><summary><a href="#sql-functions-from-lua">SQL functions from Lua</a></summary><ul>
+<li><a href="#libesqlregisterfunctionname-fn">LibESQL.RegisterFunction(name, fn)</a></li>
+</ul></details></li>
+<li><a href="#data-collection">Data collection</a></li>
+<li><details><summary><a href="#callbacks">Callbacks</a></summary><ul>
+<li><a href="#libesqlregistercallbackevent-fn--libesqlunregistercallbackevent-fn">LibESQL.RegisterCallback(event, fn) / LibESQL.UnregisterCallback(event, fn)</a></li>
+</ul></details></li>
+<li><a href="#background-jobs">Background jobs</a></li>
+<li><details><summary><a href="#mysql-export">MySQL export</a></summary><ul>
+<li><a href="#libesqltomysqlresult-tablename-opts">LibESQL.ToMySQL(result, tableName, opts)</a></li>
+<li><a href="#libesqlmysqlvaluevalue">LibESQL.MySQLValue(value)</a></li>
+<li><a href="#libesqlmysqlcolumntypevalues-declared">LibESQL.MySQLColumnType(values, declared)</a></li>
+<li><a href="#libesqlmysqltablenamename">LibESQL.MySQLTableName(name)</a></li>
+</ul></details></li>
+<li><a href="#other-add-ons-saved-data">Other add-ons&#x27; saved data</a></li>
+<li><a href="#utilities">Utilities</a></li>
+<li><a href="#low-level-libesqlsql">Low-level: LibESQL.SQL</a></li>
+<li><a href="#fields-and-limits">Fields and limits</a></li>
+<li><a href="#savedvariables">SavedVariables</a></li>
+<li><details><summary><a href="#sql-language">SQL language</a></summary><ul>
+<li><a href="#statements">Statements</a></li>
+<li><a href="#select">SELECT</a></li>
+<li><a href="#names-and-literals">Names and literals</a></li>
+<li><a href="#operators">Operators</a></li>
+<li><a href="#values-and-comparison">Values and comparison</a></li>
+<li><a href="#aggregates">Aggregates</a></li>
+</ul></details></li>
+<li><details><summary><a href="#scalar-functions">Scalar functions</a></summary><ul>
+<li><a href="#text">Text</a></li>
+<li><a href="#numbers">Numbers</a></li>
+<li><a href="#null-and-logic">NULL and logic</a></li>
+<li><a href="#time">Time</a></li>
+<li><a href="#eso">ESO</a></li>
+</ul></details></li>
+<li><a href="#performance">Performance</a></li>
+<li><details><summary><a href="#tables">Tables</a></summary><ul>
+<li><a href="#abilities">abilities</a></li>
+<li><a href="#skill_lines">skill_lines</a></li>
+<li><a href="#skills">skills</a></li>
+<li><a href="#champion_skills">champion_skills</a></li>
+<li><a href="#crafted_abilities">crafted_abilities</a></li>
+<li><a href="#scribing_scripts">scribing_scripts</a></li>
+<li><a href="#effects">effects</a></li>
+<li><a href="#effects_seen">effects_seen</a></li>
+<li><a href="#combat_log">combat_log</a></li>
+<li><a href="#hotbar">hotbar</a></li>
+<li><a href="#sets">sets</a></li>
+<li><a href="#set_bonuses">set_bonuses</a></li>
+<li><a href="#set_pieces">set_pieces</a></li>
+<li><a href="#items">items</a></li>
+<li><a href="#inventory">inventory</a></li>
+<li><a href="#character">character</a></li>
+<li><a href="#characters">characters</a></li>
+<li><a href="#stats">stats</a></li>
+<li><a href="#currencies">currencies</a></li>
+<li><a href="#quests">quests</a></li>
+<li><a href="#completed_quests">completed_quests</a></li>
+<li><a href="#achievements">achievements</a></li>
+<li><a href="#achievement_criteria">achievement_criteria</a></li>
+<li><a href="#collectibles">collectibles</a></li>
+<li><a href="#titles">titles</a></li>
+<li><a href="#dyes">dyes</a></li>
+<li><a href="#emotes">emotes</a></li>
+<li><a href="#lore_books">lore_books</a></li>
+<li><a href="#antiquities">antiquities</a></li>
+<li><a href="#recipes">recipes</a></li>
+<li><a href="#guilds">guilds</a></li>
+<li><a href="#guild_members">guild_members</a></li>
+<li><a href="#friends">friends</a></li>
+<li><a href="#group_members">group_members</a></li>
+<li><a href="#zones">zones</a></li>
+<li><a href="#pois">pois</a></li>
+<li><a href="#wayshrines">wayshrines</a></li>
+<li><a href="#activities">activities</a></li>
+<li><a href="#classes">classes</a></li>
+<li><a href="#class_skill_lines">class_skill_lines</a></li>
+<li><a href="#races">races</a></li>
+<li><a href="#maps">maps</a></li>
+<li><a href="#tables-1">tables</a></li>
+<li><a href="#columns">columns</a></li>
+<li><a href="#constants">constants</a></li>
+<li><a href="#events">events</a></li>
+<li><a href="#strings">strings</a></li>
+<li><a href="#functions">functions</a></li>
+<li><a href="#sounds">sounds</a></li>
+<li><a href="#saved_variables">saved_variables</a></li>
+<li><a href="#sv_tables">sv_tables</a></li>
+<li><a href="#sv_values">sv_values</a></li>
+</ul></details></li>
+</ul>
+<div class="tools"><button type="button" id="expand">Open / close all</button><button type="button" id="theme">Light / dark</button></div>
+</nav>
+<main>
+<h1 id="libesql-api-reference">LibESQL API Reference</h1>
+<div class="block">
+<p>Version 1.0.0 (<code>LibESQL.versionNumber</code> = 10000) · API 101049 / 101050 · PC/Mac and console</p>
+<p>This page lists every public function: its arguments, what it returns (including the <code>nil</code> and <code>false</code> cases), and the data structures it uses. It also covers the SQL dialect and every built-in table.</p>
+<p>Every table that comes with LibESQL is <strong>built in and always read-only</strong>. That covers the game data and the <code>tables</code>/<code>columns</code> lists. Your own data goes into tables you make with <code>CREATE TABLE</code> or <code>SELECT ... INTO</code>, and you change it with <code>INSERT</code>, <code>UPDATE</code> and <code>DELETE</code> (see <a href="#writing-to-your-own-tables">Writing to your own tables</a>). Those tables are saved and come back after a reload. For a shorter introduction, read the <a href="README.md">README</a>. For complete add-ons, see <a href="../LibESQL-Examples/README.md">LibESQL-Examples</a>.</p>
+<hr>
+</div>
+<section>
+<div class="block">
+<h2 id="conventions">Conventions<a class="anchor" href="#conventions" aria-label="Link to this part">#</a></h2>
+<ul><li>Everything is on the global <code>LibESQL</code>. Call functions with a dot: <code>LibESQL.Query(...)</code>, not <code>LibESQL:Query(...)</code>.</li><li>A SQL <code>NULL</code> is a Lua <code>nil</code>, and SQL booleans are Lua <code>true</code>/<code>false</code>. Numbers are Lua numbers and text is Lua strings.</li><li>Table and column names are lower case. Keywords and function names are case-insensitive.</li><li>Functions that can fail return <code>nil, errorText</code> (or <code>false, errorText</code>), and they don't raise errors. The only exceptions are programming mistakes, such as calling <code>RegisterFunction</code> without a function or <code>Scan</code> on a table that isn't scanned. Those raise with <code>assert</code>.</li><li>The library is ready when your own add-on's <code>EVENT_ADD_ON_LOADED</code> fires (LibESQL loads first). Before LibESQL's SavedVariables load, queries still work, but saved id indexes and user tables aren't available yet. Use the <a href="#callbacks"><code>Loaded</code></a> callback, or check <code>LibESQL.loaded</code>.</li></ul>
+<hr>
+</div>
+</section>
+<section>
+<div class="block">
+<h2 id="data-structures">Data structures<a class="anchor" href="#data-structures" aria-label="Link to this part">#</a></h2>
+</div>
+<div class="block">
+<h3 id="result">result<a class="anchor" href="#result" aria-label="Link to this part">#</a></h3>
+<p>What every query returns.</p>
+<div class="code"><button class="copy" type="button">Copy</button><pre><code class="lang-lua">{
+    columns   = { <span class="s">"id"</span>, <span class="s">"name"</span> },             <span class="c">-- output column names, in order</span>
+    rows      = { { <span class="n">46340</span>, <span class="s">"Molten Whip"</span> },   <span class="c">-- one array per row, values in column order</span>
+                  { <span class="n">46348</span>, <span class="k">nil</span> } },           <span class="c">-- a NULL is a hole (nil) in the array</span>
+    truncated = <span class="k">false</span>,                        <span class="c">-- true if opts.maxRows cut the result</span>
+    elapsedMs = <span class="n">3</span>,                            <span class="c">-- time to run (in-game clock)</span>
+    message   = <span class="k">nil</span>,                          <span class="c">-- text for INTO / INSERT / UPDATE / DELETE / CREATE / DROP / REFRESH / SCAN statements</span>
+    rowsAffected = <span class="k">nil</span>,                       <span class="c">-- INSERT / UPDATE / DELETE only: rows inserted, changed or removed</span>
+    inserted, updated, unchanged = <span class="k">nil</span>,       <span class="c">-- upserts only: what happened to each row</span>
+}</code></pre></div>
+<ul><li><code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code>, <code>CREATE TABLE</code>, <code>DROP TABLE</code>, <code>REFRESH</code>, <code>SCAN</code> and <code>HELP</code> return one <code>info</code> column with a line of text, which is also in <code>message</code>.</li><li>Arrays can have <code>nil</code> holes, so read cells with <code>row[c]</code> for <code>c = 1, #result.columns</code>. Don't use <code>ipairs(row)</code> or <code>#row</code>.</li><li>Column names are the alias if you gave one (<code>AS x</code>). For a plain column they are the column's name. Anything else is named by its expression text, for example <code>COUNT(*)</code>.</li><li><code>SELECT *</code> over a join prefixes names that appear in more than one table, for example <code>s.name</code> and <code>b.name</code>.</li></ul>
+</div>
+<div class="block">
+<h3 id="opts">opts<a class="anchor" href="#opts" aria-label="Link to this part">#</a></h3>
+<p>The optional last argument of <code>Query</code>, <code>QueryAsync</code> and <code>LibESQL.SQL.Run</code>.</p>
+<div class="table"><table><thead><tr><th>Field</th><th>Type</th><th>Meaning</th></tr></thead><tbody><tr><td><code>params</code></td><td>array</td><td>Values for the <code>?</code> placeholders, in order. A <code>nil</code> in the array binds <code>NULL</code>. To bind a <code>NULL</code> as the last value, also set <code>params.n</code> (<code>{ 5, nil, n = 2 }</code>).</td></tr><tr><td><code>maxRows</code></td><td>number</td><td>The most rows to return. When the query produces more, <code>result.truncated</code> is set. Without <code>ORDER BY</code>, <code>GROUP BY</code> or <code>DISTINCT</code>, the query also stops producing rows early.</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="errors">errors<a class="anchor" href="#errors" aria-label="Link to this part">#</a></h3>
+<p>Error text is a plain string meant for people, for example:</p>
+<div class="code"><button class="copy" type="button">Copy</button><pre><code class="lang-text">no table 'abilitys'. Try SHOW TABLES
+no column 'nme' in abilities. Columns: id, name, description, ...
+column 'name' is ambiguous; prefix it with a table alias
+expected FROM near 'FORM abilities'
+missing value for parameter 2
+aggregate COUNT() is not allowed here
+unterminated string starting at 31</code></pre></div>
+<p>Inside the engine, errors are tables (<code>{ esql = true, msg = "..." }</code>). <code>LibESQL.SQL.ErrorText(err)</code> turns either form into text. The public functions do that for you.</p>
+</div>
+<div class="block">
+<h3 id="job">job<a class="anchor" href="#job" aria-label="Link to this part">#</a></h3>
+<p>Returned by <code>QueryAsync</code>, <code>Scan</code> and <code>RunAsync</code>. Treat it as an opaque handle that you can pass to <a href="#background-jobs"><code>CancelJob</code></a>. A job runs in a coroutine and does a slice of work every frame (see <a href="#background-jobs">Background jobs</a>).</p>
+</div>
+<div class="block">
+<h3 id="table-definition">table definition<a class="anchor" href="#table-definition" aria-label="Link to this part">#</a></h3>
+<p>The argument of <a href="#libesqlregistertabledef"><code>RegisterTable</code></a>.</p>
+<div class="table"><table><thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Meaning</th></tr></thead><tbody><tr><td><code>name</code></td><td>string</td><td>yes</td><td>Table name, lower-cased on registration. Registering an existing name replaces that table.</td></tr><tr><td><code>desc</code></td><td>string</td><td>no</td><td>One-line description, shown by <code>SHOW TABLES</code>.</td></tr><tr><td><code>columns</code></td><td>array</td><td>yes</td><td><a href="#column-definition">Column definitions</a>, in display order.</td></tr><tr><td><code>build</code></td><td><code>function(rows, def)</code></td><td>yes*</td><td>Fills <code>rows</code> with row tables keyed by lower-case column name. Call <code>LibESQL.Tick()</code> in its loops.</td></tr><tr><td><code>live</code></td><td>boolean</td><td>no</td><td><code>true</code> rebuilds the rows on every query. Otherwise rows are built once and cached until <code>Refresh</code>.</td></tr><tr><td><code>key</code></td><td>string</td><td>no</td><td>Primary-key column. On cached tables it makes <code>WHERE key = x</code> / <code>IN (...)</code> a direct lookup.</td></tr><tr><td><code>lookup</code></td><td><code>function(keyValue) -&gt; row or nil</code></td><td>no</td><td>Your own lookup by key. It is used for <code>WHERE key = ...</code> and for joins on the key.</td></tr><tr><td><code>scan</code></td><td>table</td><td>no*</td><td>Makes an id-scan table like <code>abilities</code>. Its fields are <code>from</code>, <code>to</code>, <code>gap</code>, <code>minTo</code>, <code>exists(id)</code>, <code>makeRow(id)</code> and <code>label</code> (see <a href="#id-scans">Id scans</a>). Use this instead of <code>build</code>.</td></tr><tr><td><code>onRefresh</code></td><td><code>function(def)</code></td><td>no</td><td>Called when the table's cache is cleared.</td></tr><tr><td><code>update</code></td><td><code>function(row, changes, def)</code></td><td>no</td><td>Makes the table accept <code>UPDATE</code> and <code>LibESQL.Update</code>. It is called once per matching row with the row table and <code>{ column = newValue }</code> (<code>nil</code> for NULL). Apply the changes to your data. The table's cache is cleared afterwards.</td></tr><tr><td><code>delete</code></td><td><code>function(row, def)</code></td><td>no</td><td>Makes the table accept <code>DELETE</code> and <code>LibESQL.Delete</code>. It is called once per matching row with the row table your <code>build</code> made. Remove it from your data. The table's cache is cleared afterwards.</td></tr><tr><td><code>insert</code></td><td><code>function(row, def)</code></td><td>no</td><td>Makes the table accept <code>INSERT</code> and <code>LibESQL.Insert</code>. It is called once per row with a table keyed by lower-case column name (missing columns are <code>nil</code>). Store the row wherever your add-on keeps its data. The table's cache is cleared afterwards.</td></tr></tbody></table></div>
+<p>After registration the definition also has <code>kind</code> (<code>static</code>, <code>live</code>, <code>scan</code>, <code>user</code> or <code>temp</code>), <code>colIndex</code> (a map from lower-case name to column), and for cached tables <code>cache</code> and <code>index</code>.</p>
+</div>
+<div class="block">
+<h3 id="column-definition">column definition<a class="anchor" href="#column-definition" aria-label="Link to this part">#</a></h3>
+<p>You can write a column as an array <code>{ name, type, description, getter }</code> or as a table <code>{ name = , type = , desc = , get = }</code>.</p>
+<div class="table"><table><thead><tr><th>Part</th><th>Meaning</th></tr></thead><tbody><tr><td><code>name</code></td><td>Column name (lower-cased). It is also the key in row tables.</td></tr><tr><td><code>type</code></td><td><code>"int"</code>, <code>"num"</code>, <code>"text"</code> or <code>"bool"</code>. This is for documentation only: values are never converted.</td></tr><tr><td><code>description</code></td><td>Shown by <code>DESCRIBE</code>.</td></tr><tr><td><code>getter</code></td><td>Optional <code>function(row) -&gt; value</code>. It makes the column <strong>lazy</strong>: the value is computed only when a query reads it, then stored on the row. It runs inside <code>pcall</code>, and an error reads as <code>NULL</code>. A getter must not call <code>LibESQL.Tick()</code>.</td></tr></tbody></table></div>
+<hr>
+</div>
+</section>
+<section>
+<div class="block">
+<h2 id="querying">Querying<a class="anchor" href="#querying" aria-label="Link to this part">#</a></h2>
+</div>
+<div class="block">
+<h3 id="libesqlquerysql-opts">LibESQL.Query(sql, opts)<a class="anchor" href="#libesqlquerysql-opts" aria-label="Link to this part">#</a></h3>
+<p>Runs a statement now, in the current frame.</p>
+<ul><li><strong>Arguments:</strong> <code>sql</code> (string), <code>opts</code> (<a href="#opts">opts</a>, optional).</li><li><strong>Returns:</strong> a <a href="#result">result</a>, or <code>nil, errorText</code>.</li><li><strong>Note:</strong> the first full read of <code>abilities</code> or <code>items</code> scans every id and blocks the frame for a few seconds. Do that first read with <code>QueryAsync</code> or <code>Scan</code>. Key lookups (<code>WHERE id = ...</code>) never need the scan.</li></ul>
+<div class="code"><button class="copy" type="button">Copy</button><pre><code class="lang-lua"><span class="k">local</span> res, err = <span class="f">LibESQL</span>.<span class="f">Query</span>(<span class="s">"SELECT name, level FROM character"</span>)
+<span class="k">if</span> res <span class="k">then</span> <span class="f">d</span>(res.rows[<span class="n">1</span>][<span class="n">1</span>]) <span class="k">else</span> <span class="f">d</span>(err) <span class="k">end</span></code></pre></div>
+</div>
+<div class="block">
+<h3 id="libesqlqueryasyncsql-callback-opts">LibESQL.QueryAsync(sql, callback, opts)<a class="anchor" href="#libesqlqueryasyncsql-callback-opts" aria-label="Link to this part">#</a></h3>
+<p>Runs a statement in the background, a slice per frame.</p>
+<ul><li><strong>Arguments:</strong> <code>sql</code> (string), <code>callback</code> (<code>function(result)</code> on success, <code>function(nil, errorText)</code> on failure; optional), <code>opts</code> (optional).</li><li><strong>Returns:</strong> a <a href="#job">job</a>. The callback runs on a later frame, never inside the call.</li></ul>
+<div class="code"><button class="copy" type="button">Copy</button><pre><code class="lang-lua"><span class="f">LibESQL</span>.<span class="f">QueryAsync</span>(<span class="s">"SELECT id, name FROM abilities WHERE name LIKE ?"</span>, <span class="k">function</span>(res, err)
+    <span class="k">if</span> <span class="k">not</span> res <span class="k">then</span> <span class="f">d</span>(err) <span class="k">return</span> <span class="k">end</span>
+    <span class="f">d</span>(#res.rows .. <span class="s">" matches"</span>)
+<span class="k">end</span>, { params = { <span class="s">"%rune%"</span> } })</code></pre></div>
+</div>
+<div class="block">
+<h3 id="libesqlselectsql-params">LibESQL.Select(sql, params)<a class="anchor" href="#libesqlselectsql-params" aria-label="Link to this part">#</a></h3>
+<p>Runs a query and returns the rows as objects.</p>
+<ul><li><strong>Arguments:</strong> <code>sql</code> (string), <code>params</code> (array of <code>?</code> values, optional; this is just the params array, not an opts table).</li><li><strong>Returns:</strong> an array of tables keyed by column name (<code>{ { id = 1, name = "x" }, ... }</code>), or <code>nil, errorText</code>. With no matching rows it returns an empty table, not <code>nil</code>.</li></ul>
+</div>
+<div class="block">
+<h3 id="libesqlscalarsql-params">LibESQL.Scalar(sql, params)<a class="anchor" href="#libesqlscalarsql-params" aria-label="Link to this part">#</a></h3>
+<ul><li><strong>Returns:</strong> the first column of the first row. It returns <code>nil</code> when there are no rows or the value is <code>NULL</code>, and <code>nil, errorText</code> on error.</li></ul>
+<div class="code"><button class="copy" type="button">Copy</button><pre><code class="lang-lua"><span class="k">local</span> n = <span class="f">LibESQL</span>.<span class="f">Scalar</span>(<span class="s">"SELECT COUNT(*) FROM achievements WHERE completed"</span>)</code></pre></div>
+</div>
+<div class="block">
+<h3 id="libesqltoobjectsresult">LibESQL.ToObjects(result)<a class="anchor" href="#libesqltoobjectsresult" aria-label="Link to this part">#</a></h3>
+<ul><li><strong>Returns:</strong> the rows of a <a href="#result">result</a> as objects keyed by column name. If two columns share a name, the later one wins.</li></ul>
+</div>
+<div class="block">
+<h3 id="libesqlquotevalue">LibESQL.Quote(value)<a class="anchor" href="#libesqlquotevalue" aria-label="Link to this part">#</a></h3>
+<p>Formats a value as an SQL literal.</p>
+<ul><li><strong>Returns:</strong><ul><li>a string gives a quoted string with <code>'</code> doubled: <code>Kinras's</code> becomes <code>'Kinras''s'</code></li><li>a number gives its text</li><li><code>true</code> / <code>false</code> give <code>TRUE</code> / <code>FALSE</code></li><li><code>nil</code> gives <code>NULL</code></li></ul></li><li><strong>Tip:</strong> prefer <code>?</code> parameters. <code>Quote</code> is for building SQL text that you show to people.</li></ul>
+</div>
+<div class="block">
+<h3 id="libesqlhighlightsql-colors">LibESQL.Highlight(sql, colors)<a class="anchor" href="#libesqlhighlightsql-colors" aria-label="Link to this part">#</a></h3>
+<p>Colours SQL for display in a label, the way the ESQL window shows its query box.</p>
+<ul><li><strong>Arguments:</strong><ul><li><code>sql</code>: string. <code>nil</code> counts as <code>""</code>.</li><li><code>colors</code>: optional overrides of <code>LibESQL.SQL.HIGHLIGHT_COLORS</code>, as <code>{ kind = "RRGGBB" }</code>. Set a kind to <code>false</code> to leave it uncoloured.</li></ul></li><li><strong>Returns:</strong> the text with <code>|cRRGGBB ... |r</code> markup around each coloured token. Every literal <code>|</code> is doubled so ESO displays it, and the rest of the text is unchanged. With the markup removed (and <code>||</code> turned back into <code>|</code>), you get exactly the input again.</li><li><strong>Never fails:</strong> half-typed SQL, such as an unclosed <code>'string</code> or <code>/* comment</code>, is coloured up to the end of the text. Nothing is parsed or run.</li></ul>
+<div class="table"><table><thead><tr><th>Kind</th><th>Default</th><th>What</th></tr></thead><tbody><tr><td><code>keyword</code></td><td><code>4FC3F7</code></td><td>SQL keywords and statement words: <code>SELECT</code>, <code>FROM</code>, <code>WHERE</code>, <code>INSERT</code>, <code>UPDATE</code>, <code>CREATE</code>, <code>SHOW</code>, ...</td></tr><tr><td><code>function</code></td><td><code>FFD54F</code></td><td>A built-in or registered function name followed by <code>(</code></td></tr><tr><td><code>table</code></td><td><code>80CBC4</code></td><td>Names of tables that exist right now</td></tr><tr><td><code>string</code></td><td><code>A5D6A7</code></td><td><code>'text'</code></td></tr><tr><td><code>number</code></td><td><code>FFAB91</code></td><td><code>42</code>, <code>3.5</code>, <code>1e3</code>, <code>0x1F</code></td></tr><tr><td><code>param</code></td><td><code>CE93D8</code></td><td><code>?</code></td></tr><tr><td><code>comment</code></td><td><code>7F8C8D</code></td><td><code>-- ...</code> and <code>/* ... */</code></td></tr><tr><td><code>operator</code></td><td><code>B0BEC5</code></td><td><code>= &lt; + ( ) , *</code> and other symbols</td></tr><tr><td><code>identifier</code></td><td><code>false</code></td><td>Column names, aliases and quoted names (left uncoloured)</td></tr></tbody></table></div>
+<div class="code"><button class="copy" type="button">Copy</button><pre><code class="lang-lua">label:<span class="f">SetText</span>(<span class="f">LibESQL</span>.<span class="f">Highlight</span>(<span class="s">"SELECT name FROM abilities WHERE id = ?"</span>))
+label:<span class="f">SetText</span>(<span class="f">LibESQL</span>.<span class="f">Highlight</span>(sql, { keyword = <span class="s">"FF8800"</span>, table = <span class="k">false</span> }))</code></pre></div>
+</div>
+<div class="block">
+<h3 id="libesqlescapetext-escapechar">LibESQL.Escape(text, escapeChar)<a class="anchor" href="#libesqlescapetext-escapechar" aria-label="Link to this part">#</a></h3>
+<p>Escapes <code>LIKE</code> wildcards so <code>text</code> matches itself. Every <code>%</code>, <code>_</code> and escape character gets the escape character in front.</p>
+<ul><li><strong>Arguments:</strong><ul><li><code>text</code>: the text to escape</li><li><code>escapeChar</code>: one character, default <code>\</code></li></ul></li><li><strong>Returns:</strong> the escaped text, <code>nil</code> for <code>nil</code>, or <code>nil, errorText</code> when <code>escapeChar</code> isn't a single character.</li><li><strong>Use it with</strong> the same character in <code>ESCAPE</code>.</li></ul>
+<div class="code"><button class="copy" type="button">Copy</button><pre><code class="lang-lua"><span class="f">LibESQL</span>.<span class="f">Select</span>(<span class="s">"SELECT name FROM abilities WHERE name LIKE ? ESCAPE '\\'"</span>, { <span class="s">"%"</span> .. <span class="f">LibESQL</span>.<span class="f">Escape</span>(playerText) .. <span class="s">"%"</span> })</code></pre></div>
+</div>
+<div class="block">
+<h3 id="libesqlvalidatesql">LibESQL.Validate(sql)<a class="anchor" href="#libesqlvalidatesql" aria-label="Link to this part">#</a></h3>
+<p>Parses without running. <code>?</code> placeholders count as valid.</p>
+<ul><li><strong>Returns:</strong> <code>true</code>, or <code>false, errorText</code>.</li><li><strong>Note:</strong> it only checks syntax. Unknown tables and columns are found when the query runs.</li></ul>
+<hr>
+</div>
+</section>
+<section>
+<div class="block">
+<h2 id="writing-to-your-own-tables">Writing to your own tables<a class="anchor" href="#writing-to-your-own-tables" aria-label="Link to this part">#</a></h2>
+<p>Only tables created after LibESQL has loaded can be written to:</p>
+<ul><li>tables made with <code>CREATE TABLE</code> or <code>SELECT ... INTO</code> (kind <code>user</code>)</li><li>tables another add-on registers with its own <code>insert</code>, <code>update</code> or <code>delete</code> function</li></ul>
+<p>Every table LibESQL registers while it loads is <strong>built in</strong>. The list of built-in tables is kept inside the library, not on the table definitions, so changing a definition can't unlock one. For a built-in table:</p>
+<ul><li><code>INSERT</code>, <code>UPDATE</code> and <code>DELETE</code>, and <code>LibESQL.Insert/Update/Delete</code>, are refused, even if a write handler or <code>kind = "user"</code> is set on its definition.</li><li><code>DROP TABLE</code> is refused.</li><li><code>CREATE TABLE</code> and <code>SELECT ... INTO</code> with its name are refused.</li><li><code>RegisterTable</code> with its name raises an error.</li><li>A saved user table with the same name is never loaded over it.</li></ul>
+<p>The same goes for another add-on's table that has no write functions: it can't be written to, dropped or replaced by a user table. <code>SHOW TABLES</code> / <code>SELECT name, builtin, writable FROM tables</code> shows which tables you can write to.</p>
+<p>User tables:</p>
+<ul><li>Are saved in <code>LibESQL_SV</code> after every change, and come back after a reload.</li><li>Hold at most <code>LibESQL.USER_TABLE_MAX_ROWS</code> rows.</li><li>Convert inserted and updated values to the column type:<ul><li><code>INT</code>: numeric text becomes a number, decimals are truncated, booleans become 1/0</li><li><code>REAL</code>: numeric text becomes a number</li><li><code>TEXT</code>: values are stored as text</li><li><code>BOOL</code>: numbers and <code>'true'/'false'/'yes'/'no'/'1'/'0'</code> become booleans</li></ul></li><li>Leave values as they are in columns of type <code>any</code>, which is what <code>SELECT ... INTO</code> makes.</li></ul>
+<p><strong>Primary keys.</strong> A table made with <code>CREATE TABLE</code> can have a <code>PRIMARY KEY</code>: on one column (<code>boss TEXT PRIMARY KEY</code>), or on several (<code>PRIMARY KEY (char, slot)</code>). After that:</p>
+<ul><li><code>INSERT</code> refuses a row whose key already exists or is <code>NULL</code>.</li><li><code>UPDATE</code> refuses a change that would make two rows share a key.</li><li>Nothing is changed when a check fails.</li><li>Keys match like <code>=</code>, so <code>'Zaan'</code> and <code>'zaan'</code> are the same key.</li><li>The key is saved with the table, and <code>DESCRIBE</code> shows it as "primary key".</li></ul>
+<p><strong>Upsert.</strong> Upsert inserts new rows and updates the ones that already exist. Rows are matched on the conflict columns: by default the primary key, or the columns named in <code>ON CONFLICT (a, b)</code>, which work on tables without a key.</p>
+<ul><li>A row with a <code>NULL</code> in a conflict column never matches.</li><li>Rows earlier in the same statement count too: two new rows with one key give one insert and one update.</li><li><strong><code>LibESQL.CreateTable</code></strong> understands <code>"boss TEXT PRIMARY KEY"</code> strings and <code>{ name = , type = , primaryKey = true }</code>.</li></ul>
+</div>
+<div class="block">
+<h3 id="libesqlcreatetablename-columns-ifnotexists">LibESQL.CreateTable(name, columns, ifNotExists)<a class="anchor" href="#libesqlcreatetablename-columns-ifnotexists" aria-label="Link to this part">#</a></h3>
+<ul><li><strong>Arguments:</strong><ul><li><code>name</code>: string</li><li><code>columns</code>: an array of <code>"name TYPE"</code> strings (<code>{ "boss TEXT", "secs REAL" }</code>) or <code>{ name = , type = }</code> tables. A type is optional, and you can use any type name from <a href="#statements">CREATE TABLE</a>.</li><li><code>ifNotExists</code>: boolean</li></ul></li><li><strong>Returns:</strong> <code>true</code> when it creates the table, <code>false</code> when the table already exists and <code>ifNotExists</code> is set, or <code>nil, errorText</code>. It is an error when the name exists without <code>ifNotExists</code>, belongs to a built-in table, or no columns are given.</li><li><strong>Same as</strong> <code>CREATE TABLE [IF NOT EXISTS] name (...)</code>.</li></ul>
+</div>
+<div class="block">
+<h3 id="libesqlinserttablename-row">LibESQL.Insert(tableName, row)<a class="anchor" href="#libesqlinserttablename-row" aria-label="Link to this part">#</a></h3>
+<ul><li><strong>Arguments:</strong><ul><li><code>tableName</code>: string</li><li><code>row</code>: one row table, such as <code>{ boss = "Zaan", secs = 61.5 }</code>, or an array of them. Keys are column names (case-insensitive), and missing columns are <code>NULL</code>.</li></ul></li><li><strong>Returns:</strong> the number of rows inserted, or <code>nil, errorText</code>. It is an error when there is no such table, the table is read-only, a key isn't a column, or the row limit would be passed. Nothing is inserted if any row is invalid.</li><li><strong>Fires:</strong> <code>RowsInserted</code>.</li></ul>
+</div>
+<div class="block">
+<h3 id="libesqlupserttablename-rows-keycolumns">LibESQL.Upsert(tableName, rows, keyColumns)<a class="anchor" href="#libesqlupserttablename-rows-keycolumns" aria-label="Link to this part">#</a></h3>
+<ul><li><strong>Arguments:</strong><ul><li><code>tableName</code>: string</li><li><code>rows</code>: one row table, such as <code>{ boss = "Zaan", secs = 58 }</code>, or an array of them. Keys are column names (case-insensitive).</li><li><code>keyColumns</code>: optional. A column name, or an array of them, that identifies a row. The default is the table's <code>PRIMARY KEY</code>.</li></ul></li><li><strong>What it does:</strong> each row is inserted, or, when a row with the same key exists, that row's other given columns are updated. The key keeps its stored spelling, and columns a row doesn't give are left alone. This is the same as <code>UPSERT INTO</code>.</li><li><strong>Returns:</strong> <code>inserted + updated, { inserted, updated, unchanged }</code>, or <code>nil, errorText</code>. It is an error when there is no such table, the table is read-only, a key isn't a column, the table has no <code>PRIMARY KEY</code> and you give no <code>keyColumns</code>, or the change would break the primary key.</li><li><strong>Fires:</strong> <code>RowsUpserted(tableName, inserted, updated)</code>, plus <code>RowsInserted</code> / <code>RowsUpdated</code> for each part.</li></ul>
+<div class="code"><button class="copy" type="button">Copy</button><pre><code class="lang-lua"><span class="f">LibESQL</span>.<span class="f">Upsert</span>(<span class="s">"best"</span>, { boss = <span class="s">"Zaan"</span>, secs = <span class="n">58</span> })                              <span class="c">-- PRIMARY KEY boss</span>
+<span class="f">LibESQL</span>.<span class="f">Upsert</span>(<span class="s">"prices"</span>, { item = <span class="s">"Dreugh Wax"</span>, guild = <span class="s">"Alpha"</span>, price = <span class="n">8500</span> }, { <span class="s">"item"</span>, <span class="s">"guild"</span> })</code></pre></div>
+</div>
+<div class="block">
+<h3 id="libesqlupdatetablename-changes-where-whereparams">LibESQL.Update(tableName, changes, where, whereParams)<a class="anchor" href="#libesqlupdatetablename-changes-where-whereparams" aria-label="Link to this part">#</a></h3>
+<ul><li><strong>Arguments:</strong><ul><li><code>tableName</code>: string</li><li><code>changes</code>: <code>{ column = newValue, ... }</code> (column names are case-insensitive). Lua tables can't hold <code>nil</code>, so use <code>LibESQL.NULL</code> to set a column to <code>NULL</code>.</li><li><code>where</code>: optional SQL condition text. Leave it out to update every row.</li><li><code>whereParams</code>: optional values for the <code>?</code> placeholders in <code>where</code></li></ul></li><li><strong>Returns:</strong> the number of rows changed (0 when nothing matched), or <code>nil, errorText</code>. It is an error when there is no such table, the table is read-only, a key isn't a column, or <code>where</code> isn't valid SQL.</li><li><strong>Fires:</strong> <code>RowsUpdated</code>.</li><li><strong>Same as</strong> <code>UPDATE tableName SET ... WHERE where</code>. The change values are passed as parameters, so they are never pasted into the SQL text.</li></ul>
+<div class="code"><button class="copy" type="button">Copy</button><pre><code class="lang-lua"><span class="f">LibESQL</span>.<span class="f">Update</span>(<span class="s">"kills"</span>, { secs = <span class="n">55</span> }, <span class="s">"boss = ? AND secs &gt; ?"</span>, { <span class="s">"Zaan"</span>, <span class="n">55</span> })
+<span class="f">LibESQL</span>.<span class="f">Update</span>(<span class="s">"kills"</span>, { note = <span class="f">LibESQL</span>.NULL })          <span class="c">-- every row</span></code></pre></div>
+</div>
+<div class="block">
+<h3 id="libesqldeletetablename-where-whereparams">LibESQL.Delete(tableName, where, whereParams)<a class="anchor" href="#libesqldeletetablename-where-whereparams" aria-label="Link to this part">#</a></h3>
+<ul><li><strong>Arguments:</strong><ul><li><code>tableName</code>: string</li><li><code>where</code>: optional SQL condition text. Leave it out to delete every row (the table itself stays).</li><li><code>whereParams</code>: optional values for the <code>?</code> placeholders in <code>where</code></li></ul></li><li><strong>Returns:</strong> the number of rows removed (0 when nothing matched), or <code>nil, errorText</code>. It is an error when there is no such table, the table is read-only, or <code>where</code> isn't valid SQL.</li><li><strong>Fires:</strong> <code>RowsDeleted</code>.</li><li><strong>Same as</strong> <code>DELETE FROM tableName WHERE where</code>.</li></ul>
+<div class="code"><button class="copy" type="button">Copy</button><pre><code class="lang-lua"><span class="f">LibESQL</span>.<span class="f">Delete</span>(<span class="s">"kills"</span>, <span class="s">"at &lt; ?"</span>, { <span class="f">GetTimeStamp</span>() - <span class="n">7</span> * <span class="n">86400</span> })   <span class="c">-- older than a week</span>
+<span class="f">LibESQL</span>.<span class="f">Delete</span>(<span class="s">"kills"</span>)                                             <span class="c">-- empty the table</span></code></pre></div>
+</div>
+<div class="block">
+<h3 id="libesqldroptablename">LibESQL.DropTable(name)<a class="anchor" href="#libesqldroptablename" aria-label="Link to this part">#</a></h3>
+<ul><li><strong>Returns:</strong> <code>true</code>, or <code>nil, errorText</code> for unknown or built-in tables.</li><li><strong>Same as</strong> <code>DROP TABLE name</code>.</li></ul>
+<hr>
+</div>
+</section>
+<section>
+<div class="block">
+<h2 id="schema">Schema<a class="anchor" href="#schema" aria-label="Link to this part">#</a></h2>
+</div>
+<div class="block">
+<h3 id="libesqlgettablenames">LibESQL.GetTableNames()<a class="anchor" href="#libesqlgettablenames" aria-label="Link to this part">#</a></h3>
+<ul><li><strong>Returns:</strong> an array of every table name, in registration order (built-in tables first, then add-on tables and user tables).</li></ul>
+</div>
+<div class="block">
+<h3 id="libesqlgetcolumnstablename">LibESQL.GetColumns(tableName)<a class="anchor" href="#libesqlgetcolumnstablename" aria-label="Link to this part">#</a></h3>
+<ul><li><strong>Returns:</strong> an array of <code>{ name, type, description, lazy }</code>, or <code>nil</code> if there is no such table.</li></ul>
+</div>
+<div class="block">
+<h3 id="libesqlgettabletablename">LibESQL.GetTable(tableName)<a class="anchor" href="#libesqlgettabletablename" aria-label="Link to this part">#</a></h3>
+<ul><li><strong>Returns:</strong> the internal <a href="#table-definition">table definition</a>, or <code>nil</code>. Treat it as read-only.</li></ul>
+</div>
+<div class="block">
+<h3 id="libesqlregistertabledef">LibESQL.RegisterTable(def)<a class="anchor" href="#libesqlregistertabledef" aria-label="Link to this part">#</a></h3>
+<p>Adds a table (or replaces one with the same name), which then works in every query.</p>
+<ul><li><strong>Arguments:</strong> a <a href="#table-definition">table definition</a>.</li><li><strong>Returns:</strong> the definition.</li><li><strong>Raises</strong> when a column name appears twice, or when <code>name</code> is a built-in table (built-in tables can't be replaced).</li></ul>
+<div class="code"><button class="copy" type="button">Copy</button><pre><code class="lang-lua"><span class="f">LibESQL</span>.<span class="f">RegisterTable</span>({
+    name = <span class="s">"my_parses"</span>, desc = <span class="s">"Saved parses"</span>, key = <span class="s">"id"</span>, live = <span class="k">true</span>,
+    columns = {
+        { <span class="s">"id"</span>, <span class="s">"int"</span>, <span class="s">"Parse id"</span> },
+        { <span class="s">"boss"</span>, <span class="s">"text"</span>, <span class="s">"Boss name"</span> },
+        { <span class="s">"dps"</span>, <span class="s">"int"</span>, <span class="s">"DPS"</span> },
+        { <span class="s">"boss_upper"</span>, <span class="s">"text"</span>, <span class="s">"Upper-case boss"</span>, <span class="k">function</span>(r) <span class="k">return</span> r.boss:<span class="f">upper</span>() <span class="k">end</span> },  <span class="c">-- lazy</span>
+    },
+    build = <span class="k">function</span>(rows)
+        <span class="k">for</span> i, p <span class="k">in</span> <span class="f">ipairs</span>(MyAddon.parses) <span class="k">do</span>
+            <span class="f">LibESQL</span>.<span class="f">Tick</span>()
+            rows[#rows + <span class="n">1</span>] = { id = i, boss = p.boss, dps = p.dps }
+        <span class="k">end</span>
+    <span class="k">end</span>,
+})</code></pre></div>
+<p><code>build</code> runs inside the query's coroutine. Call <code>LibESQL.Tick()</code> once per loop iteration so a long build spreads over frames. Never call <code>Tick()</code> inside <code>pcall</code>, a metamethod or a <code>table.sort</code> comparator: Lua 5.1 can't yield there.</p>
+</div>
+<div class="block">
+<h3 id="libesqlrefreshtablename">LibESQL.Refresh(tableName)<a class="anchor" href="#libesqlrefreshtablename" aria-label="Link to this part">#</a></h3>
+<p>Drops cached rows (and the key index), so the next query rebuilds them.</p>
+<ul><li><strong>Arguments:</strong> a table name, or <code>nil</code> for every table. User tables are never touched.</li><li><strong>Returns:</strong> the number of tables cleared, or <code>nil, errorText</code> for an unknown table.</li><li><strong>Same as</strong> the SQL statements <code>REFRESH name</code> and <code>REFRESH ALL</code>.</li></ul>
+<hr>
+</div>
+</section>
+<section>
+<div class="block">
+<h2 id="id-scans">Id scans<a class="anchor" href="#id-scans" aria-label="Link to this part">#</a></h2>
+<p><code>abilities</code> and <code>items</code> have no game function that lists them. LibESQL finds them by checking every id once (<code>DoesAbilityExist</code>, or a non-empty <code>GetItemLinkName</code>) and saves the ids found in <code>LibESQL_SV</code>, keyed by <code>GetAPIVersion()</code>. After a game update, the scan runs again on first use.</p>
+<p>How a scan runs, using the fields of <code>def.scan</code>:</p>
+<ul><li>It checks ids from <code>from</code> to <code>to</code>.</li><li>It stops early once an id is past <code>minTo</code> and no id has been found in the last <code>gap</code> ids.</li><li>It calls <code>exists(id)</code> inside <code>pcall</code> for each id.</li><li>Rows are built from the saved ids on demand with <code>makeRow(id)</code>.</li></ul>
+<div class="table"><table><thead><tr><th>Table</th><th>Range</th><th>Stop rule</th></tr></thead><tbody><tr><td><code>abilities</code></td><td>1–600000</td><td>after 60000 empty ids past 250000</td></tr><tr><td><code>items</code></td><td>1–450000</td><td>after 40000 empty ids past 230000</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="libesqlscantablename-callback-force">LibESQL.Scan(tableName, callback, force)<a class="anchor" href="#libesqlscantablename-callback-force" aria-label="Link to this part">#</a></h3>
+<p>Builds the index in the background.</p>
+<ul><li><strong>Arguments:</strong><ul><li><code>tableName</code>: <code>"abilities"</code> or <code>"items"</code></li><li><code>callback</code>: optional; called as <code>function(count)</code> when done, or <code>function(nil, errorText)</code> on failure</li><li><code>force</code>: <code>true</code> throws away the saved index and scans again</li></ul></li><li><strong>Returns:</strong> a <a href="#job">job</a>.</li><li><strong>Raises</strong> if the table isn't a scan table.</li><li><strong>Progress</strong> is reported through the <code>ScanProgress</code> / <code>ScanDone</code> <a href="#callbacks">callbacks</a>.</li><li><strong>Same as</strong> the SQL statement <code>SCAN abilities</code>, which always forces a new scan.</li></ul>
+</div>
+<div class="block">
+<h3 id="libesqlisscannedtablename">LibESQL.IsScanned(tableName)<a class="anchor" href="#libesqlisscannedtablename" aria-label="Link to this part">#</a></h3>
+<ul><li><strong>Returns:</strong> <code>true, count</code> once the index exists for the current API version (in memory or saved). Otherwise it returns <code>false</code>, or <code>false, oldCount</code> when the saved index is from an older API version. Tables that aren't scanned return <code>false</code>.</li></ul>
+<hr>
+</div>
+</section>
+<section>
+<div class="block">
+<h2 id="sql-functions-from-lua">SQL functions from Lua<a class="anchor" href="#sql-functions-from-lua" aria-label="Link to this part">#</a></h2>
+</div>
+<div class="block">
+<h3 id="libesqlregisterfunctionname-fn">LibESQL.RegisterFunction(name, fn)<a class="anchor" href="#libesqlregisterfunctionname-fn" aria-label="Link to this part">#</a></h3>
+<p>Adds a scalar SQL function, or replaces one, for every query.</p>
+<ul><li><strong>Arguments:</strong><ul><li><code>name</code>: string, matched case-insensitively</li><li><code>fn</code>: receives the evaluated arguments (<code>nil</code> for <code>NULL</code>) and returns one value</li></ul></li><li><strong>Raises</strong> if the arguments have the wrong types.</li><li><strong>Errors in <code>fn</code>:</strong> they abort the query with the Lua error text. To fail with a clean message, call <code>LibESQL.SQL.Fail("message")</code> instead.</li><li><strong>Names you can't use:</strong> <code>COUNT SUM AVG MIN MAX TOTAL GROUP_CONCAT</code> are aggregates. A function you register under one of those names is never called.</li></ul>
+<div class="code"><button class="copy" type="button">Copy</button><pre><code class="lang-lua"><span class="f">LibESQL</span>.<span class="f">RegisterFunction</span>(<span class="s">"SECONDS"</span>, <span class="k">function</span>(ms) <span class="k">return</span> ms <span class="k">and</span> ms / <span class="n">1000</span> <span class="k">end</span>)
+<span class="f">LibESQL</span>.<span class="f">Query</span>(<span class="s">"SELECT name, SECONDS(duration_ms) FROM abilities WHERE id = 46340"</span>)</code></pre></div>
+<hr>
+</div>
+</section>
+<section>
+<div class="block">
+<h2 id="data-collection">Data collection<a class="anchor" href="#data-collection" aria-label="Link to this part">#</a></h2>
+<div class="table"><table><thead><tr><th>Function</th><th>Returns</th><th>Meaning</th></tr></thead><tbody><tr><td><code>LibESQL.SetEffectTracking(on)</code></td><td>none</td><td>Registers or unregisters <code>EVENT_EFFECT_CHANGED</code>. Every effect id that is gained or updated is added to <code>effects_seen</code>. The setting is saved, and the default is off. The ESQL add-on turns it on the first time it loads.</td></tr><tr><td><code>LibESQL.IsEffectTracking()</code></td><td>boolean</td><td></td></tr><tr><td><code>LibESQL.SetCombatLogging(on)</code></td><td>none</td><td>Registers or unregisters <code>EVENT_COMBAT_EVENT</code> and records events into the <code>combat_log</code> ring buffer. It is not saved, and it is off at load.</td></tr><tr><td><code>LibESQL.IsCombatLogging()</code></td><td>boolean</td><td></td></tr><tr><td><code>LibESQL.ClearCombatLog()</code></td><td>none</td><td>Empties the combat log.</td></tr></tbody></table></div>
+<p>Caps:</p>
+<ul><li><code>effects_seen</code> holds at most <code>LibESQL.EFFECTS_SEEN_MAX</code> ids. New ids are ignored once it is full. Ids already in it keep updating.</li><li><code>combat_log</code> keeps the newest <code>LibESQL.COMBAT_LOG_MAX</code> events.</li></ul>
+<hr>
+</div>
+</section>
+<section>
+<div class="block">
+<h2 id="callbacks">Callbacks<a class="anchor" href="#callbacks" aria-label="Link to this part">#</a></h2>
+</div>
+<div class="block">
+<h3 id="libesqlregistercallbackevent-fn--libesqlunregistercallbackevent-fn">LibESQL.RegisterCallback(event, fn) / LibESQL.UnregisterCallback(event, fn)<a class="anchor" href="#libesqlregistercallbackevent-fn--libesqlunregistercallbackevent-fn" aria-label="Link to this part">#</a></h3>
+<ul><li>Registering the same function twice has no effect.</li><li>Callbacks run inside <code>pcall</code>. An error in one is printed to chat and doesn't stop the others.</li></ul>
+<div class="table"><table><thead><tr><th>Event</th><th>Arguments</th><th>When</th></tr></thead><tbody><tr><td><code>Loaded</code></td><td>none</td><td>LibESQL's SavedVariables are ready (<code>LibESQL.loaded</code> is now <code>true</code>).</td></tr><tr><td><code>ScanProgress</code></td><td><code>tableName, fraction, idsFound</code></td><td>At 0, at every 10% step and at 1 during an id scan.</td></tr><tr><td><code>ScanDone</code></td><td><code>tableName, count</code></td><td>An id scan finished.</td></tr><tr><td><code>UserTableCreated</code></td><td><code>name</code></td><td><code>CREATE TABLE name</code> created a table, or <code>SELECT ... INTO name</code> created or replaced one.</td></tr><tr><td><code>UserTableDropped</code></td><td><code>name</code></td><td><code>DROP TABLE name</code>.</td></tr><tr><td><code>SavedVariablesScanned</code></td><td><code>count</code></td><td>Other add-ons' SavedVariables were scanned (see <a href="#other-add-ons-saved-data">Other add-ons' saved data</a>).</td></tr><tr><td><code>RowsInserted</code></td><td><code>tableName, count</code></td><td><code>INSERT</code> or <code>LibESQL.Insert</code> added rows.</td></tr><tr><td><code>RowsUpdated</code></td><td><code>tableName, count</code></td><td><code>UPDATE</code> or <code>LibESQL.Update</code> finished. <code>count</code> is the number of rows changed, and can be 0.</td></tr><tr><td><code>RowsDeleted</code></td><td><code>tableName, count</code></td><td><code>DELETE</code> or <code>LibESQL.Delete</code> finished. <code>count</code> is the number of rows removed, and can be 0.</td></tr><tr><td><code>RowsUpserted</code></td><td><code>tableName, inserted, updated</code></td><td>An upsert finished (any of the forms above, or <code>LibESQL.Upsert</code>).</td></tr></tbody></table></div>
+<p><code>LibESQL.FireCallbacks(event, ...)</code> fires an event. Add-ons can use it for events of their own.</p>
+<hr>
+</div>
+</section>
+<section>
+<div class="block">
+<h2 id="background-jobs">Background jobs<a class="anchor" href="#background-jobs" aria-label="Link to this part">#</a></h2>
+<p>LibESQL does long work in coroutines driven by <code>EVENT_MANAGER:RegisterForUpdate</code>. Each frame, every job resumes until it has done <code>LibESQL.budget</code> units of work. All jobs together stop after about 8 ms per frame.</p>
+<div class="table"><table><thead><tr><th>Function</th><th>Returns</th><th>Meaning</th></tr></thead><tbody><tr><td><code>LibESQL.RunAsync(fn, onDone, label)</code></td><td>job</td><td>Runs <code>fn(job)</code> in a coroutine. <code>onDone(true, returnValue)</code> or <code>onDone(false, err)</code> is called when it finishes. <code>err</code> may be an engine error table, so use <code>LibESQL.SQL.ErrorText(err)</code>. Without <code>onDone</code>, errors are printed to chat.</td></tr><tr><td><code>LibESQL.RunSync(fn)</code></td><td><code>ok, valueOrError</code></td><td>Runs <code>fn</code> now with yielding turned off (<code>pcall</code> semantics).</td></tr><tr><td><code>LibESQL.Tick(n)</code></td><td>none</td><td>Counts <code>n</code> units of work (default 1), and yields if the frame's budget is spent. It does nothing outside a job or inside <code>RunSync</code>.</td></tr><tr><td><code>LibESQL.CancelJob(job)</code></td><td>boolean</td><td>Removes one job. Its callback is not called. Returns <code>true</code> if the job was still queued.</td></tr><tr><td><code>LibESQL.CancelJobs()</code></td><td>none</td><td>Removes every job.</td></tr><tr><td><code>LibESQL.HasJobs()</code></td><td>boolean</td><td>Whether any job is queued.</td></tr></tbody></table></div>
+<hr>
+</div>
+</section>
+<section>
+<div class="block">
+<h2 id="mysql-export">MySQL export<a class="anchor" href="#mysql-export" aria-label="Link to this part">#</a></h2>
+<p>These turn query results into SQL for MySQL / MariaDB, in the layout phpMyAdmin uses for its own dumps. <code>ESQL/tools/esql_to_mysql.py</code> follows the same rules, to build a dump from SavedVariables outside the game.</p>
+</div>
+<div class="block">
+<h3 id="libesqltomysqlresult-tablename-opts">LibESQL.ToMySQL(result, tableName, opts)<a class="anchor" href="#libesqltomysqlresult-tablename-opts" aria-label="Link to this part">#</a></h3>
+<ul><li><strong>Arguments:</strong><ul><li><code>result</code>: a <a href="#result">result</a></li><li><code>tableName</code>: string. It's made safe with <code>MySQLTableName</code>.</li><li><code>opts</code>: optional; the fields are in the table below</li></ul></li><li><strong>Returns:</strong> <code>dumpText, blocks</code>.<ul><li><code>dumpText</code> is the whole dump.</li><li><code>blocks</code> is the same dump as <code>{ { text, first, last }, ... }</code>: whole statements in order. <code>first</code> and <code>last</code> are the result rows inside a block, and they are <code>nil</code> for the header and <code>CREATE TABLE</code> blocks. Join the texts with blank lines to get <code>dumpText</code>.</li></ul></li><li><strong>What it writes:</strong><ol><li><code>SET SQL_MODE</code>, <code>START TRANSACTION</code>, <code>SET time_zone</code> and <code>SET NAMES utf8mb4</code></li><li><code>DROP TABLE IF EXISTS</code></li><li><code>CREATE TABLE ... ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci</code></li><li>multi-row <code>INSERT</code>s, with the "Dumping data" comment attached to the first one</li><li><code>COMMIT</code></li></ol></li><li><strong>Ticks:</strong> it calls <code>LibESQL.Tick()</code>, so big results spread over frames inside <code>QueryAsync</code> / <code>RunAsync</code>.</li></ul>
+<div class="table"><table><thead><tr><th><code>opts</code> field</th><th>Default</th><th>Meaning</th></tr></thead><tbody><tr><td><code>types</code></td><td>inferred</td><td><code>{ "int"|"num"|"text"|"bool"|"any", ... }</code> per column, as stored for user tables</td></tr><tr><td><code>header</code></td><td><code>true</code></td><td><code>false</code> leaves out the <code>SET</code>/<code>START TRANSACTION</code> lines and <code>COMMIT</code> (to join several tables into one dump)</td></tr><tr><td><code>dropTable</code></td><td><code>true</code></td><td><code>false</code> leaves out <code>DROP TABLE IF EXISTS</code></td></tr><tr><td><code>rowsPerInsert</code></td><td>500</td><td>Rows per <code>INSERT</code> statement</td></tr><tr><td><code>maxInsertBytes</code></td><td>1000000</td><td>A new <code>INSERT</code> starts before one grows past this</td></tr><tr><td><code>comment</code></td><td>none</td><td>An extra comment line above the table</td></tr></tbody></table></div>
+<p>Column types:</p>
+<ul><li>declared <code>int</code> becomes <code>bigint(20)</code>, <code>num</code> becomes <code>double</code>, and <code>bool</code> becomes <code>tinyint(1)</code></li><li>inferred: all booleans give <code>tinyint(1)</code>; all whole numbers give <code>int(11)</code>, or <code>bigint(20)</code> past 2147483647; other numbers give <code>double</code></li><li>anything else is text by its longest value: <code>varchar(255)</code> up to 255 bytes, <code>text</code> up to 65535, then <code>mediumtext</code></li><li>every column allows <code>NULL</code></li></ul>
+<div class="code"><button class="copy" type="button">Copy</button><pre><code class="lang-lua"><span class="k">local</span> res = <span class="f">LibESQL</span>.<span class="f">Query</span>(<span class="s">"SELECT id, name, duration_ms FROM abilities WHERE name LIKE '%whip%'"</span>)
+<span class="k">local</span> sql = <span class="f">LibESQL</span>.<span class="f">ToMySQL</span>(res, <span class="s">"whips"</span>)</code></pre></div>
+</div>
+<div class="block">
+<h3 id="libesqlmysqlvaluevalue">LibESQL.MySQLValue(value)<a class="anchor" href="#libesqlmysqlvaluevalue" aria-label="Link to this part">#</a></h3>
+<ul><li><strong>Returns:</strong> a MySQL literal.<ul><li><code>nil</code>, NaN and infinity give <code>NULL</code>.</li><li>booleans give <code>1</code> / <code>0</code>.</li><li>whole numbers are written without a decimal point. This uses <code>%.0f</code>, so values past 2^31 stay exact.</li><li>strings are quoted, with <code>\</code>, <code>'</code>, NUL, newline, carriage return and Ctrl-Z escaped.</li></ul></li></ul>
+</div>
+<div class="block">
+<h3 id="libesqlmysqlcolumntypevalues-declared">LibESQL.MySQLColumnType(values, declared)<a class="anchor" href="#libesqlmysqlcolumntypevalues-declared" aria-label="Link to this part">#</a></h3>
+<ul><li><strong>Returns:</strong> the MySQL column type for an array of a column's non-NULL values, following the rules above.</li></ul>
+</div>
+<div class="block">
+<h3 id="libesqlmysqltablenamename">LibESQL.MySQLTableName(name)<a class="anchor" href="#libesqlmysqltablenamename" aria-label="Link to this part">#</a></h3>
+<ul><li><strong>Returns:</strong> a safe MySQL table name.<ul><li>It is lower-cased, with anything other than letters, digits and <code>_</code> turned into <code>_</code>.</li><li>It is at most 64 characters.</li><li>Names starting with a digit get a <code>t_</code> prefix, and an empty name becomes <code>esql_export</code>.</li></ul></li></ul>
+</div>
+</section>
+<section>
+<div class="block">
+<h2 id="other-add-ons-saved-data">Other add-ons' saved data<a class="anchor" href="#other-add-ons-saved-data" aria-label="Link to this part">#</a></h2>
+<p>LibESQL turns other add-ons' SavedVariables into read-only tables (file <code>LibESQL_SavedVars.lua</code>). SavedVariables are global Lua tables once the game has loaded them, on PC and on console alike.</p>
+<p><strong>What counts as saved data:</strong></p>
+<ul><li>Every global table in the <code>ZO_SavedVars</code> shape: <code>Global[profile]["@account"]["$AccountWide" | characterId] = data</code>.</li><li>Tables added with <code>AddSavedVariable</code>.</li><li><code>LibESQL_SV</code> and <code>ESQL_SV</code> are skipped (their data is already in your tables). The game's own <code>ZO_*</code> saved variables are skipped unless <code>LibESQL.SV_INCLUDE_GAME = true</code>.</li></ul>
+<p><strong>When the scan runs:</strong> once on the first <code>EVENT_PLAYER_ACTIVATED</code>, again on <code>SCAN savedvariables</code> or <code>RescanSavedVariables()</code>, and on the first query of <code>saved_variables</code>, <code>sv_tables</code> or <code>sv_values</code> if none has run yet. A rescan removes tables whose data has gone, and keeps the same names for the rest.</p>
+<p><strong>Which nodes become tables:</strong> a node becomes a table when most of its children are tables that look alike, and they hold plain values. "Look alike" means their keys are array-style, or (with 3 or more of them) they share their most common field.</p>
+<p><strong>Generated tables:</strong></p>
+<ul><li><strong>Name:</strong> <code>sv_&lt;saved variable&gt;_&lt;path&gt;</code>.<ul><li>The saved variable's name is lower-cased, with suffixes like <code>SavedVars</code>, <code>_SV</code> or <code>_Settings</code> dropped.</li><li>Path parts with <code>*</code> (any key) are left out.</li><li>A name that's already taken gets <code>_2</code>, <code>_3</code>... added. That includes the built-in names, so <code>sv_values</code> and <code>sv_tables</code> can never be replaced.</li></ul></li><li><strong>Fixed columns:</strong> <code>account</code>, <code>scope</code> (character name or <code>account-wide</code>), <code>character_id</code>, <code>key</code> (the record's key in its list) and <code>path</code> (where it is, for example <code>savedFights.3.snapshot.skillList.2</code>).</li><li><strong>Field columns:</strong> after the fixed columns come up to <code>SV_MAX_COLUMNS</code> field columns, most common first. Names are made safe: numeric keys become <code>c1</code>, <code>c2</code>..., and a field that clashes with a fixed column becomes <code>f_&lt;name&gt;</code>. Only plain values (text, number, boolean) are copied; nested tables have their own tables.</li><li><strong>Kind:</strong> live and read-only (not built in, and not writable). <code>INSERT</code>/<code>UPDATE</code>/<code>DELETE</code>/<code>DROP</code> are refused, and the add-on's data is never changed.</li><li><strong>Safe to read:</strong> every list is copied before LibESQL works through it, so an add-on changing its data while a query runs is safe.</li></ul>
+<div class="table"><table><thead><tr><th>Function</th><th>Returns</th><th>Meaning</th></tr></thead><tbody><tr><td><code>LibESQL.RescanSavedVariables(callback)</code></td><td>job</td><td>Rescans in the background. Calls <code>callback(count)</code>, or <code>callback(nil, errorText)</code> on failure.</td></tr><tr><td><code>LibESQL.ScanSavedVariables()</code></td><td>count</td><td>The same, run now (inside a query or job it spreads over frames).</td></tr><tr><td><code>LibESQL.AddSavedVariable(globalName)</code></td><td><code>true</code> or <code>nil, errorText</code></td><td>Includes a plain table that doesn't use <code>ZO_SavedVars</code>. It's remembered in <code>LibESQL_SV.extraSavedVariables</code>. The next scan picks it up.</td></tr><tr><td><code>LibESQL.RemoveSavedVariable(globalName)</code></td><td><code>true</code></td><td>Leaves it out again.</td></tr><tr><td><code>LibESQL.GetSavedVariables()</code></td><td>array</td><td><code>{ { name, addon, style, tables = { { table_name, pattern, records, columns }, ... } }, ... }</code></td></tr><tr><td><code>LibESQL.SV_MAX_NODES</code></td><td>number</td><td>Tables visited per saved variable while looking for lists. PC 250000, console 30000. Past it, <code>saved_variables.truncated</code> is true.</td></tr><tr><td><code>LibESQL.SV_MAX_VALUES</code></td><td>number</td><td>Rows <code>sv_values</code> builds per query. PC 200000, console 20000.</td></tr><tr><td><code>LibESQL.SV_MAX_COLUMNS</code></td><td>number</td><td>Field columns per generated table (60).</td></tr><tr><td><code>LibESQL.SV_EXCLUDE</code></td><td>set</td><td>Global names never scanned.</td></tr><tr><td><code>LibESQL.SV_INCLUDE_GAME</code></td><td>boolean</td><td>Also scan the game's own <code>ZO_*</code> saved variables (default <code>false</code>).</td></tr></tbody></table></div>
+<p><strong>Callback:</strong> <code>SavedVariablesScanned(count)</code> fires after every scan.</p>
+<p>The <code>addon</code> column is a guess. It's the longest installed add-on name the saved variable's name starts with, so it can be empty when the names don't match (<code>HarvestDC_SavedVars</code> doesn't start with <code>HarvestMapDC</code>).</p>
+<hr>
+</div>
+</section>
+<section>
+<div class="block">
+<h2 id="utilities">Utilities<a class="anchor" href="#utilities" aria-label="Link to this part">#</a></h2>
+<div class="table"><table><thead><tr><th>Function</th><th>Returns</th><th>Meaning</th></tr></thead><tbody><tr><td><code>LibESQL.Print(fmt, ...)</code></td><td>none</td><td>Prints <code>[ESQL] ...</code> to chat, <code>string.format</code> style.</td></tr><tr><td><code>LibESQL.Try(fn, ...)</code></td><td><code>...</code> or <code>nil</code></td><td>Calls <code>fn</code> in <code>pcall</code> and returns all its results, or <code>nil</code> on error or when <code>fn</code> isn't a function.</td></tr><tr><td><code>LibESQL.CleanName(s)</code></td><td>string</td><td>Removes the game's grammar suffix: <code>"Fire Rune^n"</code> becomes <code>"Fire Rune"</code>.</td></tr><tr><td><code>LibESQL.StripMarkup(s)</code></td><td>string</td><td>Removes <code>|c</code> colours, <code>|t</code> textures and <code>|H</code> links (keeping the link text).</td></tr><tr><td><code>LibESQL.EnumName(prefix, value)</code></td><td>string or nil</td><td><code>("BUFF_EFFECT_TYPE_", 2)</code> gives <code>"BUFF_EFFECT_TYPE_DEBUFF"</code>. When several names share a value, the shortest wins. <code>MIN_VALUE</code>/<code>MAX_VALUE</code> names are skipped.</td></tr><tr><td><code>LibESQL.EnumShort(prefix, value)</code></td><td>string or nil</td><td>The same without the prefix, lower case: <code>"debuff"</code>.</td></tr><tr><td><code>LibESQL.EnumRange(prefix, lo, hi)</code></td><td>lo, hi</td><td>The <code>prefix..MIN_VALUE</code> / <code>MAX_VALUE</code> (or <code>ITERATION_BEGIN/END</code>) of an enum, or the fallbacks you pass.</td></tr><tr><td><code>LibESQL.GlobalPairs()</code></td><td>iterator</td><td>A safe <code>pairs(_G)</code> that uses <code>zo_insecurePairs</code> and skips the game's private functions.</td></tr><tr><td><code>LibESQL.NowMs()</code></td><td>number</td><td><code>GetGameTimeMilliseconds()</code>.</td></tr><tr><td><code>LibESQL.IsBuiltinTable(name)</code></td><td>boolean</td><td>Whether a table comes with LibESQL (and so is always read-only).</td></tr><tr><td><code>LibESQL.CheckWritable(def, action)</code></td><td><code>"user"</code> or <code>"handler"</code></td><td>The check every write goes through (<code>action</code> is <code>"INSERT"</code>, <code>"UPDATE"</code> or <code>"DELETE"</code>). It raises an engine error when the table can't be written to.</td></tr><tr><td><code>LibESQL.NULL</code></td><td>sentinel</td><td>Stands for SQL <code>NULL</code> where Lua can't store <code>nil</code>, for example in <code>Update</code> changes.</td></tr><tr><td><code>LibESQL.AbilityName(id)</code></td><td>string or nil</td><td>Clean ability name, <code>nil</code> if empty.</td></tr><tr><td><code>LibESQL.ItemLink(id)</code></td><td>string</td><td>A base item link for an item id.</td></tr></tbody></table></div>
+<hr>
+</div>
+</section>
+<section>
+<div class="block">
+<h2 id="low-level-libesqlsql">Low-level: LibESQL.SQL<a class="anchor" href="#low-level-libesqlsql" aria-label="Link to this part">#</a></h2>
+<p>These are for tools and other UIs. Most add-ons don't need them.</p>
+<div class="table"><table><thead><tr><th>Function</th><th>Returns</th><th>Meaning</th></tr></thead><tbody><tr><td><code>SQL.Run(text, opts)</code></td><td>result</td><td>Parses and runs. It raises an engine error table on failure. Call it inside <code>RunAsync</code> or <code>RunSync</code>.</td></tr><tr><td><code>SQL.Parse(text, params)</code></td><td>statement AST</td><td>Parses only. It raises on syntax errors.</td></tr><tr><td><code>SQL.ExecuteStatement(stmt, opts)</code></td><td>result</td><td>Runs a parsed statement.</td></tr><tr><td><code>SQL.ErrorText(err)</code></td><td>string</td><td>The text of an engine error table or a Lua error.</td></tr><tr><td><code>SQL.Fail(fmt, ...)</code></td><td>(raises)</td><td>Raises an engine error, for your own functions and builders.</td></tr><tr><td><code>SQL.Compare(a, b)</code></td><td>-1, 0, 1 or nil</td><td>SQL comparison: <code>nil</code> if either side is <code>NULL</code>, case-insensitive text, numbers parsed from text.</td></tr><tr><td><code>SQL.SortCompare(a, b)</code></td><td>-1, 0, 1</td><td>The <code>ORDER BY</code> order: <code>NULL</code> first, then numbers and booleans, then text (case-insensitive).</td></tr><tr><td><code>SQL.ToText(v)</code></td><td>string or nil</td><td>How values print: integers without <code>.0</code>, <code>nil</code> stays <code>nil</code>.</td></tr><tr><td><code>SQL.NormKey(v)</code></td><td>value</td><td>The key used for <code>IN</code>, <code>GROUP BY</code>, <code>DISTINCT</code> and joins. Text is lowered, numeric text becomes a number, and booleans become 1/0.</td></tr><tr><td><code>SQL.Tokenize(text)</code></td><td>tokens</td><td>The lexer.</td></tr><tr><td><code>SQL.FUNCS</code></td><td>table</td><td>Scalar functions by upper-case name. <code>RegisterFunction</code> writes here.</td></tr><tr><td><code>SQL.HELP</code></td><td>array of strings</td><td>The text shown by <code>HELP</code>.</td></tr><tr><td><code>SQL.Highlight(text, colors)</code></td><td>string</td><td>The highlighter behind <code>LibESQL.Highlight</code>. Here <code>colors</code> replaces the whole palette instead of being merged into it.</td></tr><tr><td><code>SQL.HIGHLIGHT_COLORS</code></td><td>table</td><td>The default palette. Changing it changes the colours for every add-on.</td></tr></tbody></table></div>
+<hr>
+</div>
+</section>
+<section>
+<div class="block">
+<h2 id="fields-and-limits">Fields and limits<a class="anchor" href="#fields-and-limits" aria-label="Link to this part">#</a></h2>
+<div class="table"><table><thead><tr><th>Field</th><th>PC</th><th>Console</th><th>Meaning</th></tr></thead><tbody><tr><td><code>LibESQL.version</code></td><td><code>"1.0.0"</code></td><td></td><td>Version string</td></tr><tr><td><code>LibESQL.versionNumber</code></td><td><code>10000</code></td><td></td><td>Same as <code>## AddOnVersion</code></td></tr><tr><td><code>LibESQL.isConsole</code></td><td><code>false</code></td><td><code>true</code></td><td><code>IsConsoleUI()</code> at load</td></tr><tr><td><code>LibESQL.loaded</code></td><td></td><td></td><td><code>true</code> after SavedVariables load</td></tr><tr><td><code>LibESQL.budget</code></td><td>3000</td><td>700</td><td>Units of work per job per frame</td></tr><tr><td><code>LibESQL.COMBAT_LOG_MAX</code></td><td>30000</td><td>5000</td><td>Combat events kept</td></tr><tr><td><code>LibESQL.EFFECTS_SEEN_MAX</code></td><td>20000</td><td>3000</td><td>Distinct effect ids remembered</td></tr><tr><td><code>LibESQL.USER_TABLE_MAX_ROWS</code></td><td>50000</td><td>5000</td><td>Rows allowed in one user table (<code>SELECT ... INTO</code> or <code>INSERT</code>)</td></tr></tbody></table></div>
+<p>You can change <code>budget</code> at run time. A lower value gives smoother frames and slower queries.</p>
+<hr>
+</div>
+</section>
+<section>
+<div class="block">
+<h2 id="savedvariables">SavedVariables<a class="anchor" href="#savedvariables" aria-label="Link to this part">#</a></h2>
+<p><code>LibESQL_SV</code> is account-wide (<code>ZO_SavedVars:NewAccountWide</code>, version 1):</p>
+<div class="table"><table><thead><tr><th>Key</th><th>Contents</th></tr></thead><tbody><tr><td><code>scans[table]</code></td><td><code>{ api, ranges, count, maxId }</code>. <code>ranges</code> is a compact base-36 string of id runs.</td></tr><tr><td><code>effectsSeen[abilityId]</code></td><td><code>{ timesSeen, lastSeenTimestamp, flags, maxStacks, effectType, abilityType, statusEffectType }</code>. The <code>flags</code> bits are 1 = on you, 2 = on others, 4 = applied by you.</td></tr><tr><td><code>userTables[name]</code></td><td><code>{ columns = {...}, types = {...}, primaryKey = {...}, rows = { {v1, v2, ...}, ... }, desc }</code>, from <code>CREATE TABLE</code>, <code>INSERT</code> and <code>SELECT ... INTO</code></td></tr><tr><td><code>trackEffects</code></td><td>boolean</td></tr></tbody></table></div>
+<hr>
+</div>
+</section>
+<section>
+<div class="block">
+<h2 id="sql-language">SQL language<a class="anchor" href="#sql-language" aria-label="Link to this part">#</a></h2>
+</div>
+<div class="block">
+<h3 id="statements">Statements<a class="anchor" href="#statements" aria-label="Link to this part">#</a></h3>
+<div class="table"><table><thead><tr><th>Statement</th><th>Result</th></tr></thead><tbody><tr><td><code>SELECT ...</code></td><td>Rows (see below).</td></tr><tr><td><code>SELECT ... INTO name FROM ...</code></td><td>Rows. The result is also saved as user table <code>name</code>, replacing any user table with that name. Column names are lower-cased, and repeated names get <code>_2</code>, <code>_3</code>... You can't overwrite a built-in table.</td></tr><tr><td><code>SHOW TABLES</code></td><td><code>name, kind, description</code> for every table</td></tr><tr><td><code>DESCRIBE t</code> / <code>DESC t</code></td><td><code>column_name, type, description</code></td></tr><tr><td><code>CREATE TABLE [IF NOT EXISTS] t (col [type], ...)</code></td><td>Creates an empty user table. The types are <code>INT</code>/<code>INTEGER</code>/<code>BIGINT</code>/<code>SMALLINT</code>, <code>REAL</code>/<code>FLOAT</code>/<code>DOUBLE</code>/<code>NUMBER</code>/<code>NUMERIC</code>/<code>DECIMAL</code>, <code>TEXT</code>/<code>STRING</code>/<code>VARCHAR</code>/<code>CHAR</code> and <code>BOOL</code>/<code>BOOLEAN</code>. Sizes such as <code>VARCHAR(40)</code> are accepted and ignored. A missing or unknown type means <code>any</code>.</td></tr><tr><td><code>INSERT INTO t [(col, ...)] VALUES (v, ...) [, (v, ...)]</code></td><td>Adds rows. Values can be any constant expression, <code>?</code>, a function, or a <code>(SELECT ...)</code>. Without a column list, each row must give every column in order.</td></tr><tr><td><code>INSERT INTO t [(col, ...)] SELECT ...</code></td><td>Adds the rows a query returns, matched to the columns by position.</td></tr><tr><td><code>CREATE TABLE t (a TEXT PRIMARY KEY, ...)</code> / <code>CREATE TABLE t (a, b, PRIMARY KEY (a, b))</code></td><td>A table with a primary key. <code>NOT NULL</code> is accepted after a column (key columns are never <code>NULL</code> anyway).</td></tr><tr><td><code>UPSERT INTO t [(cols)] VALUES ... | SELECT ...</code></td><td>Inserts new rows. Rows whose primary key already exists get the given columns updated, and the key keeps its spelling.</td></tr><tr><td><code>INSERT OR REPLACE INTO ...</code> / <code>REPLACE INTO ...</code></td><td>Inserts, or overwrites the whole existing row. Columns left out become <code>NULL</code>.</td></tr><tr><td><code>INSERT OR IGNORE INTO ...</code></td><td>Inserts, and leaves existing rows alone.</td></tr><tr><td><code>INSERT ... ON CONFLICT [(cols)] DO NOTHING</code></td><td>The same as <code>INSERT OR IGNORE</code>, matching on <code>cols</code> (default: the primary key).</td></tr><tr><td><code>INSERT ... ON CONFLICT [(cols)] DO UPDATE SET c = expr [, ...] [WHERE cond]</code></td><td>Updates the existing row. In <code>expr</code> and <code>cond</code>, a plain or <code>t.</code>-qualified column is the row already in the table, and <code>excluded.col</code> is the row you tried to insert. Rows that fail <code>cond</code> stay unchanged.</td></tr><tr><td><code>INSERT ... ON DUPLICATE KEY UPDATE c = expr [, ...]</code></td><td>MySQL style, matching on the primary key. <code>VALUES(col)</code> is the value you tried to insert.</td></tr><tr><td><code>UPDATE t [[AS] alias] SET col = expr [, col = expr ...] [WHERE cond]</code></td><td>Changes the rows where <code>cond</code> is true, or every row without <code>WHERE</code>. <code>SET</code> expressions and <code>WHERE</code> can use the row's columns (<code>SET secs = secs - 1</code>), <code>?</code> and subqueries. Every <code>SET</code> is computed from the row as it was before the update, and a column can be set only once per statement. <code>SET t.col = ...</code> is accepted.</td></tr><tr><td><code>DELETE FROM t [[AS] alias] [WHERE cond]</code></td><td>Removes the rows where <code>cond</code> is true, or every row without <code>WHERE</code>. The table itself stays; use <code>DROP TABLE</code> to remove it. <code>WHERE</code> can use the row's columns, <code>?</code> and subqueries, and is checked for every row before any row is removed.</td></tr><tr><td><code>DROP TABLE t</code></td><td>Removes a user table. Built-in tables and other add-ons' tables can't be dropped.</td></tr><tr><td><code>REFRESH t</code> / <code>REFRESH ALL</code></td><td>Clears cached rows.</td></tr><tr><td><code>SCAN abilities</code> / <code>SCAN items</code></td><td>Rebuilds the id index (always a fresh scan).</td></tr><tr><td><code>SCAN savedvariables</code></td><td>Finds other add-ons' SavedVariables again and rebuilds the tables made from them.</td></tr><tr><td><code>HELP</code></td><td>A short syntax summary, one line per row.</td></tr></tbody></table></div>
+<p>A trailing <code>;</code> is allowed. Comments are <code>-- to end of line</code> and <code>/* ... */</code>.</p>
+</div>
+<div class="block">
+<h3 id="select">SELECT<a class="anchor" href="#select" aria-label="Link to this part">#</a></h3>
+<div class="code"><button class="copy" type="button">Copy</button><pre><code class="lang-sql"><span class="k">SELECT</span> [<span class="k">DISTINCT</span> | <span class="k">ALL</span>] item [, item ...]
+       [<span class="k">INTO</span> new_table]
+       [<span class="k">FROM</span> source [[<span class="k">INNER</span> | <span class="k">LEFT</span> [<span class="k">OUTER</span>] | <span class="k">CROSS</span>] <span class="k">JOIN</span> source [<span class="k">ON</span> condition] | , source] ...]
+       [<span class="k">WHERE</span> condition]
+       [<span class="k">GROUP</span> <span class="k">BY</span> expr [, expr ...]]
+       [<span class="k">HAVING</span> condition]
+       [<span class="k">ORDER</span> <span class="k">BY</span> expr [<span class="k">ASC</span> | <span class="k">DESC</span>] [, ...]]
+       [<span class="k">LIMIT</span> n [<span class="k">OFFSET</span> m] | <span class="k">LIMIT</span> m, n]
+
+item   := *  |  alias.*  |  expr [[<span class="k">AS</span>] alias]
+source := <span class="k">table</span> [[<span class="k">AS</span>] alias]  |  (<span class="k">SELECT</span> ...) [<span class="k">AS</span>] alias</code></pre></div>
+<ul><li><strong>No <code>FROM</code>:</strong> <code>SELECT 1 + 1</code> returns one row.</li><li><strong>Aliases:</strong> an alias can follow without <code>AS</code>.</li><li><strong><code>LEFT JOIN</code>:</strong> needs <code>ON</code>. A comma join is a cross join that you filter with <code>WHERE</code>.</li><li><strong><code>GROUP BY</code>, <code>ORDER BY</code> and <code>HAVING</code></strong> can use output column numbers (<code>ORDER BY 2</code>) and output aliases.</li><li><strong>Columns that aren't grouped or aggregated</strong> take their value from the first row of each group.</li><li><strong><code>HAVING</code></strong> needs <code>GROUP BY</code> or an aggregate.</li><li><strong>An aggregate query with no rows</strong> and no <code>GROUP BY</code> still returns one row: <code>COUNT(*) = 0</code>, and the other aggregates are <code>NULL</code>.</li><li><strong>Correlation:</strong> subqueries are uncorrelated (they can't read columns of the outer query). Each runs once, the first time it's needed.</li></ul>
+</div>
+<div class="block">
+<h3 id="names-and-literals">Names and literals<a class="anchor" href="#names-and-literals" aria-label="Link to this part">#</a></h3>
+<div class="table"><table><thead><tr><th>Form</th><th>Meaning</th></tr></thead><tbody><tr><td><code>name</code>, <code>t.name</code></td><td>A column. An unqualified name must be unique across the joined tables.</td></tr><tr><td><code>"name"</code>, `<code> </code>name<code> </code><code>, </code>[name]`</td><td>A quoted name. A double-quoted name that matches no column is used as a text value, as in SQLite, so <code>WHERE x = "fire"</code> works.</td></tr><tr><td><code>'text'</code></td><td>Text. Write <code>''</code> for a single quote.</td></tr><tr><td><code>42</code>, <code>3.5</code>, <code>1e3</code>, <code>0x1F</code></td><td>Numbers</td></tr><tr><td><code>TRUE</code>, <code>FALSE</code>, <code>NULL</code></td><td>Literals</td></tr><tr><td><code>?</code></td><td>A parameter from <code>opts.params</code></td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="operators">Operators<a class="anchor" href="#operators" aria-label="Link to this part">#</a></h3>
+<p>Highest precedence first:</p>
+<div class="table"><table><thead><tr><th>Precedence</th><th>Operators</th></tr></thead><tbody><tr><td>1</td><td>unary <code>-</code>, <code>+</code></td></tr><tr><td>2</td><td><code>*</code> <code>/</code> <code>%</code></td></tr><tr><td>3</td><td><code>+</code> <code>-</code></td></tr><tr><td>4</td><td><code>||</code> (concatenation)</td></tr><tr><td>5</td><td><code>=</code> <code>==</code> <code>!=</code> <code>&lt;&gt;</code> <code>&lt;</code> <code>&lt;=</code> <code>&gt;</code> <code>&gt;=</code>, <code>[NOT] LIKE</code>, <code>[NOT] IN (...)</code>, <code>[NOT] BETWEEN a AND b</code>, <code>IS [NOT] NULL</code></td></tr><tr><td>6</td><td><code>NOT</code></td></tr><tr><td>7</td><td><code>AND</code></td></tr><tr><td>8</td><td><code>OR</code></td></tr></tbody></table></div>
+<p>Other expressions:</p>
+<ul><li><code>CASE WHEN c THEN v ... [ELSE v] END</code>, and <code>CASE x WHEN v THEN r ... END</code></li><li><code>CAST(x AS INT | INTEGER | REAL | NUMBER | FLOAT | TEXT | STRING | BOOL)</code></li><li><code>EXISTS (SELECT ...)</code>, <code>x IN (SELECT ...)</code> (the subquery returns one column), and <code>(SELECT ...)</code> as a value (first row, first column)</li></ul>
+</div>
+<div class="block">
+<h3 id="values-and-comparison">Values and comparison<a class="anchor" href="#values-and-comparison" aria-label="Link to this part">#</a></h3>
+<ul><li><strong><code>NULL</code>:</strong> any comparison or arithmetic with <code>NULL</code> gives <code>NULL</code>. <code>WHERE</code> keeps only rows whose condition is true. <code>AND</code>/<code>OR</code> use three-valued logic: <code>NULL AND FALSE</code> is <code>FALSE</code>, and <code>NULL OR TRUE</code> is <code>TRUE</code>.</li><li><strong>Text is case-insensitive</strong> for <code>=</code>, <code>&lt;</code>, <code>IN</code>, <code>ORDER BY</code>, <code>GROUP BY</code> and <code>DISTINCT</code>. So <code>WHERE name = 'molten whip'</code> matches.</li><li><strong>Number vs text:</strong> text that parses as a number compares as that number. Other text compares as text.</li><li><strong>Booleans</strong> compare and sum as 1 and 0, so <code>SUM(unlocked)</code> counts the true values. <code>WHERE passive</code> is the same as <code>WHERE passive = TRUE</code>.</li><li><strong>Arithmetic:</strong> <code>/</code> always gives a decimal (<code>10 / 4 = 2.5</code>). Dividing by zero, or <code>%</code> by zero, gives <code>NULL</code>. <code>%</code> follows <code>math.fmod</code>. Text in arithmetic is parsed as a number, and becomes <code>NULL</code> if it isn't one.</li><li><strong><code>||</code>:</strong> joins the text of both sides. If either side is <code>NULL</code>, the result is <code>NULL</code>.</li><li><strong><code>CAST(x AS INT)</code></strong> truncates toward zero.</li><li><strong><code>LIKE</code>:</strong> <code>%</code> matches any run of characters and <code>_</code> matches one character, ignoring case. <code>LIKE pattern ESCAPE 'c'</code> makes the character after <code>c</code> match itself: <code>LIKE '%100!%%' ESCAPE '!'</code> finds text containing <code>100%</code>. The escape is any single character, given as a constant, <code>?</code> or a column, and <code>ESCAPE NULL</code> gives <code>NULL</code>. A pattern that ends with the escape character is an error. To match text a player typed, escape it with <code>ESCAPE()</code> / <code>LibESQL.Escape</code>. For Lua patterns, use <code>MATCH()</code>.</li></ul>
+</div>
+<div class="block">
+<h3 id="aggregates">Aggregates<a class="anchor" href="#aggregates" aria-label="Link to this part">#</a></h3>
+<div class="table"><table><thead><tr><th>Function</th><th>Result</th></tr></thead><tbody><tr><td><code>COUNT(*)</code></td><td>Rows</td></tr><tr><td><code>COUNT(x)</code>, <code>COUNT(DISTINCT x)</code></td><td>Non-NULL values, or distinct non-NULL values</td></tr><tr><td><code>SUM(x)</code></td><td>Sum of the values, or <code>NULL</code> when there are none</td></tr><tr><td><code>TOTAL(x)</code></td><td>Like <code>SUM</code>, but 0 when there are none</td></tr><tr><td><code>AVG(x)</code></td><td>Average, or <code>NULL</code> when there are none</td></tr><tr><td><code>MIN(x)</code>, <code>MAX(x)</code></td><td>Smallest or largest, in <code>ORDER BY</code> order (works on text too)</td></tr><tr><td><code>GROUP_CONCAT(x [, 'sep'])</code></td><td>Values joined with <code>sep</code> (default <code>,</code>). <code>sep</code> must be a constant.</td></tr></tbody></table></div>
+<p><code>DISTINCT</code> works inside any aggregate. Aggregates can't be nested and can't appear in <code>WHERE</code>.</p>
+<hr>
+</div>
+</section>
+<section>
+<div class="block">
+<h2 id="scalar-functions">Scalar functions<a class="anchor" href="#scalar-functions" aria-label="Link to this part">#</a></h2>
+<p>Unless noted, any <code>NULL</code> argument gives <code>NULL</code>. Text matching ignores case.</p>
+</div>
+<div class="block">
+<h3 id="text">Text<a class="anchor" href="#text" aria-label="Link to this part">#</a></h3>
+<div class="table"><table><thead><tr><th>Function</th><th>Result</th></tr></thead><tbody><tr><td><code>LOWER(s)</code>, <code>UPPER(s)</code></td><td>Case-converted text</td></tr><tr><td><code>LENGTH(s)</code>, <code>LEN(s)</code></td><td>Bytes</td></tr><tr><td><code>SUBSTR(s, start [, len])</code>, <code>SUBSTRING</code></td><td>Part of <code>s</code>. <code>start</code> is 1-based, and a negative <code>start</code> counts from the end.</td></tr><tr><td><code>LEFT(s, n)</code>, <code>RIGHT(s, n)</code></td><td>The first or last <code>n</code> characters</td></tr><tr><td><code>TRIM(s)</code>, <code>LTRIM(s)</code>, <code>RTRIM(s)</code></td><td><code>s</code> without surrounding spaces</td></tr><tr><td><code>REPLACE(s, find, with)</code></td><td>Plain-text replace of every occurrence</td></tr><tr><td><code>INSTR(s, find)</code></td><td>1-based position, or 0</td></tr><tr><td><code>CONTAINS(s, find)</code>, <code>STARTSWITH(s, find)</code></td><td>Boolean</td></tr><tr><td><code>MATCH(s, luaPattern)</code></td><td>Boolean (<code>string.find</code> with a Lua pattern)</td></tr><tr><td><code>CAPTURE(s, luaPattern)</code></td><td>The first capture, or the whole match</td></tr><tr><td><code>CONCAT(a, b, ...)</code></td><td>Joined text. <code>NULL</code>s are skipped.</td></tr><tr><td><code>CONCAT_WS(sep, a, b, ...)</code></td><td>Joined with <code>sep</code>. <code>NULL</code>s are skipped.</td></tr><tr><td><code>PRINTF(fmt, ...)</code>, <code>FORMAT</code></td><td><code>string.format</code></td></tr><tr><td><code>ESCAPE(s [, c])</code></td><td><code>s</code> with <code>%</code>, <code>_</code> and <code>c</code> (default <code>\</code>) prefixed by <code>c</code>, so it matches itself in <code>LIKE ... ESCAPE 'c'</code>: <code>name LIKE '%' || ESCAPE(?) || '%' ESCAPE '\'</code></td></tr><tr><td><code>QUOTE(x)</code></td><td><code>x</code> as an SQL literal: <code>'it''s'</code>, <code>42</code>, <code>NULL</code>, <code>TRUE</code> (like <code>LibESQL.Quote</code>)</td></tr><tr><td><code>CHAR(n, ...)</code></td><td>Characters from byte values</td></tr><tr><td><code>HEX(n)</code></td><td>Upper-case hex</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="numbers">Numbers<a class="anchor" href="#numbers" aria-label="Link to this part">#</a></h3>
+<div class="table"><table><thead><tr><th>Function</th><th>Result</th></tr></thead><tbody><tr><td><code>ABS(x)</code>, <code>SIGN(x)</code></td><td>Absolute value; -1, 0 or 1</td></tr><tr><td><code>ROUND(x [, digits])</code></td><td>Rounded, half up (default 0 digits)</td></tr><tr><td><code>FLOOR(x)</code>, <code>CEIL(x)</code>, <code>CEILING(x)</code></td><td>Rounded down or up</td></tr><tr><td><code>SQRT(x)</code></td><td>Square root, or <code>NULL</code> for a negative <code>x</code></td></tr><tr><td><code>POWER(x, y)</code>, <code>POW</code></td><td><code>x ^ y</code></td></tr><tr><td><code>MOD(x, y)</code></td><td><code>x % y</code>, or <code>NULL</code> when <code>y</code> is 0</td></tr><tr><td><code>MIN(a, b, ...)</code>, <code>MAX(a, b, ...)</code></td><td>With two or more arguments: the smallest or largest. <code>NULL</code> if any argument is <code>NULL</code>.</td></tr><tr><td><code>RANDOM()</code>, <code>RANDOM(a, b)</code></td><td><code>math.random</code></td></tr><tr><td><code>MS_TO_S(ms)</code></td><td><code>ms / 1000</code></td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="null-and-logic">NULL and logic<a class="anchor" href="#null-and-logic" aria-label="Link to this part">#</a></h3>
+<div class="table"><table><thead><tr><th>Function</th><th>Result</th></tr></thead><tbody><tr><td><code>COALESCE(a, b, ...)</code></td><td>The first argument that isn't <code>NULL</code></td></tr><tr><td><code>IFNULL(a, b)</code>, <code>NVL</code></td><td><code>a</code>, or <code>b</code> when <code>a</code> is <code>NULL</code></td></tr><tr><td><code>NULLIF(a, b)</code></td><td><code>NULL</code> if <code>a = b</code>, otherwise <code>a</code></td></tr><tr><td><code>IIF(cond, a, b)</code>, <code>IF</code></td><td><code>a</code> if <code>cond</code> is true, otherwise <code>b</code></td></tr><tr><td><code>TYPEOF(x)</code></td><td><code>null</code>, <code>integer</code>, <code>real</code>, <code>text</code> or <code>boolean</code></td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="time">Time<a class="anchor" href="#time" aria-label="Link to this part">#</a></h3>
+<div class="table"><table><thead><tr><th>Function</th><th>Result</th></tr></thead><tbody><tr><td><code>NOW()</code>, <code>CURRENT_TIMESTAMP</code>, <code>LOCALTIMESTAMP</code></td><td>The current local date and time as text, <code>'2026-11-20 14:05:33'</code> (like MySQL)</td></tr><tr><td><code>CURRENT_DATE</code>, <code>CURDATE()</code></td><td><code>'2026-11-20'</code></td></tr><tr><td><code>CURRENT_TIME</code>, <code>CURTIME()</code></td><td><code>'14:05:33'</code></td></tr><tr><td><code>UNIX_TIMESTAMP()</code></td><td>Seconds since 1970 (UTC), the same as the game's <code>GetTimeStamp()</code>. Use it for numbers you store and do maths with.</td></tr><tr><td><code>UNIX_TIMESTAMP(text)</code></td><td>Parses <code>'2026-11-20'</code>, <code>'2026-11-20 14:05'</code> or <code>'2026-11-20T14:05:33'</code> (local time) into seconds. Gives <code>NULL</code> for a date it can't read.</td></tr><tr><td><code>FROM_UNIXTIME(ts [, fmt])</code></td><td>A stored timestamp as local date-time text, by default <code>'2026-11-20 14:05:33'</code></td></tr><tr><td><code>DATE(ts [, fmt])</code></td><td>Formats a timestamp, by default with the time. <code>DATE('2026-11-20 14:05:33')</code> gives the date part, <code>'2026-11-20'</code>.</td></tr></tbody></table></div>
+<p>Notes:</p>
+<ul><li><strong>Without brackets:</strong> <code>CURRENT_TIMESTAMP</code>, <code>CURRENT_DATE</code>, <code>CURRENT_TIME</code> and <code>LOCALTIMESTAMP</code> can be written without brackets, as in standard SQL.</li><li><strong>Once per statement:</strong> these zero-argument functions are worked out once per statement, so every row of one query gets the same time, even when the query is spread over several frames.</li><li><strong>Comparing:</strong> the text forms sort correctly (<code>WHERE at &gt; '2026-11-01'</code>).</li><li><strong>Doing maths:</strong> for date maths, use <code>UNIX_TIMESTAMP()</code> numbers (<code>UNIX_TIMESTAMP() - 7 * 86400</code>), then show them with <code>FROM_UNIXTIME</code>.</li><li><strong>Format codes:</strong> <code>fmt</code> uses <code>os.date</code> / strftime codes, such as <code>%Y %m %d %H %M %S</code>. Where the game has no <code>os.date</code> (console), the dates are worked out from <code>GetTimeStamp()</code> and the local clock (<code>GetDate</code>, <code>GetSecondsSinceMidnight</code>). That supports <code>%Y %y %m %d %H %M %S %%</code>, and uses the current UTC offset, so old timestamps from before a daylight-saving change can show one hour off.</li></ul>
+</div>
+<div class="block">
+<h3 id="eso">ESO<a class="anchor" href="#eso" aria-label="Link to this part">#</a></h3>
+<div class="table"><table><thead><tr><th>Function</th><th>Result</th></tr></thead><tbody><tr><td><code>ABILITY_NAME(id)</code></td><td>Clean ability name</td></tr><tr><td><code>ABILITY_DESC(id)</code></td><td>Tooltip description</td></tr><tr><td><code>ABILITY_ICON(id)</code></td><td>Icon path</td></tr><tr><td><code>ABILITY_DURATION(id)</code></td><td>Duration in ms</td></tr><tr><td><code>ABILITY_LINK(id)</code></td><td>Chat link</td></tr><tr><td><code>SET_NAME(id)</code></td><td>Item set name</td></tr><tr><td><code>ZONE_NAME(id)</code></td><td>Zone name</td></tr><tr><td><code>ITEM_NAME(idOrLink)</code></td><td>Item name</td></tr><tr><td><code>ITEM_LINK(id)</code></td><td>A base item link</td></tr><tr><td><code>ITEM_ID(link)</code></td><td>The item id in a link</td></tr><tr><td><code>COLLECTIBLE_NAME(id)</code>, <code>ACHIEVEMENT_NAME(id)</code></td><td>Names</td></tr><tr><td><code>CLEAN(s)</code>, <code>STRIP(s)</code></td><td><code>s</code> without grammar suffixes and markup</td></tr><tr><td><code>ICON(path [, size])</code></td><td><code>|t</code> texture markup (default size 24)</td></tr><tr><td><code>ENUM(prefix, value)</code></td><td>Constant name: <code>ENUM('ACTION_RESULT_', 1)</code></td></tr><tr><td><code>CONST(name)</code></td><td>A global's value: <code>CONST('STAT_POWER')</code></td></tr><tr><td><code>STR(id or 'SI_NAME')</code></td><td><code>GetString(id)</code></td></tr></tbody></table></div>
+<hr>
+</div>
+</section>
+<section>
+<div class="block">
+<h2 id="performance">Performance<a class="anchor" href="#performance" aria-label="Link to this part">#</a></h2>
+<p>The engine always gives correct results. These features make the common cases fast:</p>
+<ul><li><strong>Key lookups:</strong> on the first table, <code>WHERE key = c</code>, <code>key IN (c, ...)</code>, and on scan tables <code>key BETWEEN a AND b</code> (up to 200,000 ids) fetch rows directly instead of reading the whole table. <code>abilities WHERE id = 46340</code> never needs the id scan.</li><li><strong>Join plans:</strong> a join on <code>t.col = &lt;earlier table expression&gt;</code> uses one of two plans. On a scan table's key, it looks up each row directly. Otherwise it builds a hash of the joined table once.</li><li><strong>WHERE pushdown:</strong> for inner joins, each part of a <code>WHERE ... AND ...</code> is checked as soon as the tables it uses are bound, and it can drive a hash join.</li><li><strong>Early stop:</strong> without <code>ORDER BY</code>, <code>GROUP BY</code> or <code>DISTINCT</code>, a query stops reading rows once <code>LIMIT</code> (or <code>maxRows</code>) is reached.</li><li><strong>Lazy columns:</strong> expensive columns, such as an ability's description, cost or skill line, are read from the game only when a query uses them. Name only the columns you need: <code>SELECT *</code> over <code>abilities</code> reads every column of every row.</li><li><strong>Name cache:</strong> on PC, ability names are cached for the session after the first read, which makes repeated <code>name LIKE</code> searches fast. Console skips this to save memory.</li><li><strong>Caching:</strong> static tables are built once and stay cached until <code>REFRESH</code>. Live tables (inventory, effects, quests...) rebuild on every query.</li></ul>
+<hr>
+</div>
+</section>
+<section>
+<div class="block">
+<h2 id="tables">Tables<a class="anchor" href="#tables" aria-label="Link to this part">#</a></h2>
+<p>The tables below were generated from the library's own table definitions. Run <code>DESCRIBE &lt;table&gt;</code> in game for the same list.</p>
+<ul><li><code>scan</code>: rows come from the saved id index.</li><li><code>live</code>: read on every query.</li><li><code>static</code>: built once, cached until <code>REFRESH</code>.</li><li><em>(lazy)</em>: the column is read from the game only when a query uses it.</li></ul>
+<p>Text values from game enums use the constant's name, lower-cased and without its prefix. For example <code>BUFF_EFFECT_TYPE_DEBUFF</code> becomes <code>debuff</code>, and <code>ITEM_DISPLAY_QUALITY_LEGENDARY</code> becomes <code>legendary</code>.</p>
+</div>
+<div class="block">
+<h3 id="abilities">abilities<a class="anchor" href="#abilities" aria-label="Link to this part">#</a></h3>
+<p>Every ability id in the game (scanned once per update). Columns are read on demand. Kind: <strong>scan</strong>  ·  Key: <code>id</code></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>id</code></td><td>int</td><td>Ability id</td></tr><tr><td><code>name</code></td><td>text</td><td>Ability name <em>(lazy)</em></td></tr><tr><td><code>description</code></td><td>text</td><td>Tooltip description <em>(lazy)</em></td></tr><tr><td><code>icon</code></td><td>text</td><td>Icon texture path <em>(lazy)</em></td></tr><tr><td><code>duration_ms</code></td><td>int</td><td>Duration in ms (0 = instant or none) <em>(lazy)</em></td></tr><tr><td><code>cast_ms</code></td><td>int</td><td>Cast or channel time in ms <em>(lazy)</em></td></tr><tr><td><code>channeled</code></td><td>bool</td><td>Channeled ability <em>(lazy)</em></td></tr><tr><td><code>cost</code></td><td>int</td><td>Base resource cost <em>(lazy)</em></td></tr><tr><td><code>cost_mechanic</code></td><td>text</td><td>Resource used: magicka, stamina, health, ultimate... <em>(lazy)</em></td></tr><tr><td><code>cost_over_time</code></td><td>bool</td><td>Cost is paid over time <em>(lazy)</em></td></tr><tr><td><code>cooldown_ms</code></td><td>int</td><td>Cooldown in ms <em>(lazy)</em></td></tr><tr><td><code>min_range</code></td><td>int</td><td>Minimum range (cm) <em>(lazy)</em></td></tr><tr><td><code>max_range</code></td><td>int</td><td>Maximum range (cm, 2800 = 28 m) <em>(lazy)</em></td></tr><tr><td><code>radius</code></td><td>int</td><td>Area radius (cm) <em>(lazy)</em></td></tr><tr><td><code>angle</code></td><td>int</td><td>Cone angle <em>(lazy)</em></td></tr><tr><td><code>target</code></td><td>text</td><td>Target description (Self, Enemy, Area...) <em>(lazy)</em></td></tr><tr><td><code>passive</code></td><td>bool</td><td>Passive ability <em>(lazy)</em></td></tr><tr><td><code>permanent</code></td><td>bool</td><td>Permanent effect <em>(lazy)</em></td></tr><tr><td><code>ultimate</code></td><td>bool</td><td>Ultimate ability <em>(lazy)</em></td></tr><tr><td><code>toggled</code></td><td>bool</td><td>Duration is a toggle <em>(lazy)</em></td></tr><tr><td><code>buff_type</code></td><td>int</td><td>BuffType enum value <em>(lazy)</em></td></tr><tr><td><code>buff_type_name</code></td><td>text</td><td>BuffType name (major_*, minor_*...) <em>(lazy)</em></td></tr><tr><td><code>frequency_ms</code></td><td>int</td><td>Tick interval in ms <em>(lazy)</em></td></tr><tr><td><code>role_tank</code></td><td>bool</td><td>Flagged as a tank ability <em>(lazy)</em></td></tr><tr><td><code>role_healer</code></td><td>bool</td><td>Flagged as a healer ability <em>(lazy)</em></td></tr><tr><td><code>role_dps</code></td><td>bool</td><td>Flagged as a damage ability <em>(lazy)</em></td></tr><tr><td><code>header</code></td><td>text</td><td>Description header <em>(lazy)</em></td></tr><tr><td><code>new_effect</code></td><td>text</td><td>Morph's new effect lines <em>(lazy)</em></td></tr><tr><td><code>mundus</code></td><td>text</td><td>Mundus stone this ability belongs to <em>(lazy)</em></td></tr><tr><td><code>crafted_ability_id</code></td><td>int</td><td>Scribing grimoire id <em>(lazy)</em></td></tr><tr><td><code>is_player_skill</code></td><td>bool</td><td>Part of a player skill line <em>(lazy)</em></td></tr><tr><td><code>skill_type</code></td><td>text</td><td>class, weapon, armor, guild, ava, racial, world, tradeskill... <em>(lazy)</em></td></tr><tr><td><code>skill_line_id</code></td><td>int</td><td>Skill line id <em>(lazy)</em></td></tr><tr><td><code>skill_line</code></td><td>text</td><td>Skill line name <em>(lazy)</em></td></tr><tr><td><code>skill_index</code></td><td>int</td><td>Index in the skill line <em>(lazy)</em></td></tr><tr><td><code>morph</code></td><td>int</td><td>0 = base, 1 / 2 = morphs <em>(lazy)</em></td></tr><tr><td><code>rank</code></td><td>int</td><td>Skill rank <em>(lazy)</em></td></tr><tr><td><code>link</code></td><td>text</td><td>Chat link <em>(lazy)</em></td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="skill_lines">skill_lines<a class="anchor" href="#skill_lines" aria-label="Link to this part">#</a></h3>
+<p>Skill lines available to this character (class, weapon, armor, guild, world...) Kind: <strong>live</strong>  ·  Key: <code>id</code></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>id</code></td><td>int</td><td>Skill line id</td></tr><tr><td><code>name</code></td><td>text</td><td>Skill line name</td></tr><tr><td><code>skill_type</code></td><td>text</td><td>class, weapon, armor, world, guild, ava, racial, tradeskill...</td></tr><tr><td><code>skill_type_id</code></td><td>int</td><td>SkillType enum value</td></tr><tr><td><code>line_index</code></td><td>int</td><td>Index within its skill type</td></tr><tr><td><code>rank</code></td><td>int</td><td>Current rank</td></tr><tr><td><code>active</code></td><td>bool</td><td>Line is active for this character</td></tr><tr><td><code>discovered</code></td><td>bool</td><td>Line is discovered</td></tr><tr><td><code>class_id</code></td><td>int</td><td>Class id for class lines</td></tr><tr><td><code>num_skills</code></td><td>int</td><td>Number of skills in the line</td></tr><tr><td><code>xp</code></td><td>int</td><td>Current XP in the rank</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="skills">skills<a class="anchor" href="#skills" aria-label="Link to this part">#</a></h3>
+<p>Every skill in your skill lines: one row per morph (actives) or rank (passives) Kind: <strong>live</strong></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>ability_id</code></td><td>int</td><td>Ability id of this morph / rank</td></tr><tr><td><code>name</code></td><td>text</td><td>Skill name</td></tr><tr><td><code>line_id</code></td><td>int</td><td>Skill line id</td></tr><tr><td><code>line_name</code></td><td>text</td><td>Skill line name</td></tr><tr><td><code>skill_type</code></td><td>text</td><td>class, weapon, armor, guild...</td></tr><tr><td><code>skill_index</code></td><td>int</td><td>Index in the line</td></tr><tr><td><code>morph</code></td><td>int</td><td>0 = base, 1 / 2 = morphs (actives)</td></tr><tr><td><code>rank</code></td><td>int</td><td>Rank (passives)</td></tr><tr><td><code>max_rank</code></td><td>int</td><td>Highest passive rank</td></tr><tr><td><code>passive</code></td><td>bool</td><td>Passive skill</td></tr><tr><td><code>ultimate</code></td><td>bool</td><td>Ultimate skill</td></tr><tr><td><code>purchased</code></td><td>bool</td><td>You bought this skill</td></tr><tr><td><code>current</code></td><td>bool</td><td>This is the morph / rank you have now</td></tr><tr><td><code>line_rank_needed</code></td><td>int</td><td>Skill line rank needed to unlock</td></tr><tr><td><code>progression_id</code></td><td>int</td><td>Progression id (actives)</td></tr><tr><td><code>crafted_ability_id</code></td><td>int</td><td>Scribing grimoire id</td></tr><tr><td><code>icon</code></td><td>text</td><td>Icon texture path</td></tr><tr><td><code>description</code></td><td>text</td><td>Tooltip <em>(lazy)</em></td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="champion_skills">champion_skills<a class="anchor" href="#champion_skills" aria-label="Link to this part">#</a></h3>
+<p>Champion point stars in every constellation Kind: <strong>static</strong>  ·  Key: <code>id</code></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>id</code></td><td>int</td><td>Champion skill id</td></tr><tr><td><code>name</code></td><td>text</td><td>Star name</td></tr><tr><td><code>discipline</code></td><td>text</td><td>Constellation (Warfare, Fitness, Craft)</td></tr><tr><td><code>discipline_id</code></td><td>int</td><td>Discipline id</td></tr><tr><td><code>discipline_type</code></td><td>text</td><td>combat, conditioning, world</td></tr><tr><td><code>skill_type</code></td><td>text</td><td>normal, normal_slottable, stat_pool_slottable...</td></tr><tr><td><code>slottable</code></td><td>bool</td><td>Can be slotted</td></tr><tr><td><code>max_points</code></td><td>int</td><td>Max points</td></tr><tr><td><code>ability_id</code></td><td>int</td><td>Ability id behind the star</td></tr><tr><td><code>cluster</code></td><td>text</td><td>Cluster name, if in a cluster</td></tr><tr><td><code>description</code></td><td>text</td><td>Tooltip at 0 extra points <em>(lazy)</em></td></tr><tr><td><code>current_bonus</code></td><td>text</td><td>Current bonus text <em>(lazy)</em></td></tr><tr><td><code>x</code></td><td>num</td><td>Position in the constellation</td></tr><tr><td><code>y</code></td><td>num</td><td>Position in the constellation</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="crafted_abilities">crafted_abilities<a class="anchor" href="#crafted_abilities" aria-label="Link to this part">#</a></h3>
+<p>Scribing grimoires Kind: <strong>static</strong>  ·  Key: <code>id</code></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>id</code></td><td>int</td><td>Crafted ability (grimoire) id</td></tr><tr><td><code>name</code></td><td>text</td><td>Grimoire name</td></tr><tr><td><code>description</code></td><td>text</td><td>Description</td></tr><tr><td><code>icon</code></td><td>text</td><td>Icon</td></tr><tr><td><code>ability_id</code></td><td>int</td><td>Representative ability id</td></tr><tr><td><code>skill_type</code></td><td>text</td><td>Skill type it belongs to</td></tr><tr><td><code>hint</code></td><td>text</td><td>How to acquire</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="scribing_scripts">scribing_scripts<a class="anchor" href="#scribing_scripts" aria-label="Link to this part">#</a></h3>
+<p>Scribing scripts (focus, signature, affix) Kind: <strong>static</strong>  ·  Key: <code>id</code></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>id</code></td><td>int</td><td>Script id</td></tr><tr><td><code>name</code></td><td>text</td><td>Script name</td></tr><tr><td><code>slot</code></td><td>text</td><td>primary (focus), secondary (signature), tertiary (affix)</td></tr><tr><td><code>description</code></td><td>text</td><td>General description</td></tr><tr><td><code>icon</code></td><td>text</td><td>Icon</td></tr><tr><td><code>hint</code></td><td>text</td><td>How to acquire</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="effects">effects<a class="anchor" href="#effects" aria-label="Link to this part">#</a></h3>
+<p>Buffs and debuffs active right now on you, your target, bosses, group and companion Kind: <strong>live</strong></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>unit</code></td><td>text</td><td>Unit tag (player, reticleover, boss1, group3...)</td></tr><tr><td><code>unit_name</code></td><td>text</td><td>Unit name</td></tr><tr><td><code>ability_id</code></td><td>int</td><td>Effect ability id</td></tr><tr><td><code>name</code></td><td>text</td><td>Effect name</td></tr><tr><td><code>stacks</code></td><td>int</td><td>Stack count</td></tr><tr><td><code>remaining_s</code></td><td>num</td><td>Seconds left (NULL for permanent)</td></tr><tr><td><code>duration_s</code></td><td>num</td><td>Total duration in seconds (NULL for permanent)</td></tr><tr><td><code>start_s</code></td><td>num</td><td>Game time when it started (s)</td></tr><tr><td><code>end_s</code></td><td>num</td><td>Game time when it ends (s)</td></tr><tr><td><code>permanent</code></td><td>bool</td><td>No end time</td></tr><tr><td><code>effect_type</code></td><td>text</td><td>buff or debuff</td></tr><tr><td><code>ability_type</code></td><td>text</td><td>AbilityType name</td></tr><tr><td><code>status_effect</code></td><td>text</td><td>Status effect (burning, poisoned, ...)</td></tr><tr><td><code>buff_type_name</code></td><td>text</td><td>BuffType (major_*/minor_*) <em>(lazy)</em></td></tr><tr><td><code>cast_by_player</code></td><td>bool</td><td>You applied it</td></tr><tr><td><code>can_click_off</code></td><td>bool</td><td>Can be cancelled</td></tr><tr><td><code>slot</code></td><td>int</td><td>Buff slot</td></tr><tr><td><code>icon</code></td><td>text</td><td>Icon</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="effects_seen">effects_seen<a class="anchor" href="#effects_seen" aria-label="Link to this part">#</a></h3>
+<p>Every buff/debuff id seen while effect tracking is on (saved across sessions) Kind: <strong>live</strong>  ·  Key: <code>ability_id</code></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>ability_id</code></td><td>int</td><td>Effect ability id</td></tr><tr><td><code>name</code></td><td>text</td><td>Name <em>(lazy)</em></td></tr><tr><td><code>times_seen</code></td><td>int</td><td>How often it was gained or refreshed</td></tr><tr><td><code>last_seen</code></td><td>int</td><td>Unix time last seen</td></tr><tr><td><code>on_player</code></td><td>bool</td><td>Seen on you</td></tr><tr><td><code>on_others</code></td><td>bool</td><td>Seen on other units</td></tr><tr><td><code>from_player</code></td><td>bool</td><td>Applied by you</td></tr><tr><td><code>max_stacks</code></td><td>int</td><td>Highest stack count seen</td></tr><tr><td><code>effect_type</code></td><td>text</td><td>buff or debuff</td></tr><tr><td><code>ability_type</code></td><td>text</td><td>AbilityType name</td></tr><tr><td><code>status_effect</code></td><td>text</td><td>Status effect</td></tr><tr><td><code>duration_ms</code></td><td>int</td><td>Ability duration <em>(lazy)</em></td></tr><tr><td><code>icon</code></td><td>text</td><td>Icon <em>(lazy)</em></td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="combat_log">combat_log<a class="anchor" href="#combat_log" aria-label="Link to this part">#</a></h3>
+<p>Combat events recorded this session while logging is on (/esql log on) Kind: <strong>live</strong></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>seq</code></td><td>int</td><td>Order received</td></tr><tr><td><code>time_ms</code></td><td>int</td><td>Game time in ms</td></tr><tr><td><code>result</code></td><td>text</td><td>damage, critical_damage, heal, dot_tick, blocked_damage, ...</td></tr><tr><td><code>result_id</code></td><td>int</td><td>ActionResult enum value</td></tr><tr><td><code>ability_id</code></td><td>int</td><td>Ability id</td></tr><tr><td><code>ability</code></td><td>text</td><td>Ability name</td></tr><tr><td><code>source</code></td><td>text</td><td>Source name</td></tr><tr><td><code>source_type</code></td><td>text</td><td>player, group, other, player_pet...</td></tr><tr><td><code>target</code></td><td>text</td><td>Target name</td></tr><tr><td><code>target_type</code></td><td>text</td><td>player, group, other...</td></tr><tr><td><code>hit</code></td><td>int</td><td>Damage / heal value</td></tr><tr><td><code>overflow</code></td><td>int</td><td>Overkill / overheal</td></tr><tr><td><code>damage_type</code></td><td>text</td><td>fire, shock, physical...</td></tr><tr><td><code>power_type</code></td><td>text</td><td>Resource for power events</td></tr><tr><td><code>is_error</code></td><td>bool</td><td>Error result</td></tr><tr><td><code>source_unit_id</code></td><td>int</td><td>Source unit id</td></tr><tr><td><code>target_unit_id</code></td><td>int</td><td>Target unit id</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="hotbar">hotbar<a class="anchor" href="#hotbar" aria-label="Link to this part">#</a></h3>
+<p>Skills slotted on your front and back bars Kind: <strong>live</strong></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>bar</code></td><td>text</td><td>primary, backup, ...</td></tr><tr><td><code>slot</code></td><td>int</td><td>Slot index (3-7 skills, 8 ultimate)</td></tr><tr><td><code>ability_id</code></td><td>int</td><td>Slotted ability id</td></tr><tr><td><code>name</code></td><td>text</td><td>Ability name</td></tr><tr><td><code>icon</code></td><td>text</td><td>Icon <em>(lazy)</em></td></tr><tr><td><code>active_bar</code></td><td>bool</td><td>This bar is active now</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="sets">sets<a class="anchor" href="#sets" aria-label="Link to this part">#</a></h3>
+<p>Every item set: type, category, pieces, bonuses Kind: <strong>static</strong>  ·  Key: <code>id</code></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>id</code></td><td>int</td><td>Item set id</td></tr><tr><td><code>name</code></td><td>text</td><td>Set name</td></tr><tr><td><code>set_type</code></td><td>text</td><td>crafted, dungeon, monster, trial, overland, arena, mythic, cyrodiil...</td></tr><tr><td><code>max_equipped</code></td><td>int</td><td>Pieces for the full bonus</td></tr><tr><td><code>num_bonuses</code></td><td>int</td><td>Number of bonus lines</td></tr><tr><td><code>in_collection</code></td><td>bool</td><td>Listed in the set collections UI</td></tr><tr><td><code>category</code></td><td>text</td><td>Collection category</td></tr><tr><td><code>parent_category</code></td><td>text</td><td>Parent collection category</td></tr><tr><td><code>category_id</code></td><td>int</td><td>Collection category id</td></tr><tr><td><code>perfected</code></td><td>bool</td><td>Perfected version of another set</td></tr><tr><td><code>unperfected_id</code></td><td>int</td><td>Set id of the non-perfected version</td></tr><tr><td><code>num_pieces</code></td><td>int</td><td>Collectible pieces</td></tr><tr><td><code>pieces_unlocked</code></td><td>int</td><td>Pieces you have unlocked <em>(lazy)</em></td></tr><tr><td><code>bonuses</code></td><td>text</td><td>All bonus lines in one text <em>(lazy)</em></td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="set_bonuses">set_bonuses<a class="anchor" href="#set_bonuses" aria-label="Link to this part">#</a></h3>
+<p>One row per set bonus line Kind: <strong>static</strong></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>set_id</code></td><td>int</td><td>Item set id</td></tr><tr><td><code>set_name</code></td><td>text</td><td>Set name</td></tr><tr><td><code>bonus_index</code></td><td>int</td><td>Bonus line number</td></tr><tr><td><code>num_required</code></td><td>int</td><td>Pieces required</td></tr><tr><td><code>description</code></td><td>text</td><td>Bonus text</td></tr><tr><td><code>perfected</code></td><td>bool</td><td>Perfected-only bonus</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="set_pieces">set_pieces<a class="anchor" href="#set_pieces" aria-label="Link to this part">#</a></h3>
+<p>Every collectible piece of every set, with item details Kind: <strong>static</strong></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>set_id</code></td><td>int</td><td>Item set id</td></tr><tr><td><code>set_name</code></td><td>text</td><td>Set name</td></tr><tr><td><code>piece_id</code></td><td>int</td><td>Collection piece id</td></tr><tr><td><code>item_id</code></td><td>int</td><td>Item id <em>(lazy)</em></td></tr><tr><td><code>link</code></td><td>text</td><td>Item link</td></tr><tr><td><code>unlocked</code></td><td>bool</td><td>You have it in your collection <em>(lazy)</em></td></tr><tr><td><code>name</code></td><td>text</td><td>Item name <em>(lazy)</em></td></tr><tr><td><code>icon</code></td><td>text</td><td>Icon <em>(lazy)</em></td></tr><tr><td><code>item_type</code></td><td>text</td><td>weapon, armor, potion, food, recipe, furnishing... <em>(lazy)</em></td></tr><tr><td><code>specialized_type</code></td><td>text</td><td>Specialized item type <em>(lazy)</em></td></tr><tr><td><code>quality</code></td><td>text</td><td>normal, magic, arcane, artifact, legendary, mythic_override <em>(lazy)</em></td></tr><tr><td><code>equip_type</code></td><td>text</td><td>head, chest, ring, one_hand... <em>(lazy)</em></td></tr><tr><td><code>armor_type</code></td><td>text</td><td>light, medium, heavy <em>(lazy)</em></td></tr><tr><td><code>weapon_type</code></td><td>text</td><td>sword, bow, fire_staff... <em>(lazy)</em></td></tr><tr><td><code>trait</code></td><td>text</td><td>Item trait <em>(lazy)</em></td></tr><tr><td><code>level</code></td><td>int</td><td>Required level <em>(lazy)</em></td></tr><tr><td><code>cp</code></td><td>int</td><td>Required champion points <em>(lazy)</em></td></tr><tr><td><code>value</code></td><td>int</td><td>Vendor value <em>(lazy)</em></td></tr><tr><td><code>bind_type</code></td><td>text</td><td>on_pickup, on_equip, ... <em>(lazy)</em></td></tr><tr><td><code>style</code></td><td>text</td><td>Motif style <em>(lazy)</em></td></tr><tr><td><code>unique</code></td><td>bool</td><td>Unique item <em>(lazy)</em></td></tr><tr><td><code>armor_rating</code></td><td>int</td><td>Armor rating <em>(lazy)</em></td></tr><tr><td><code>weapon_power</code></td><td>int</td><td>Weapon damage <em>(lazy)</em></td></tr><tr><td><code>on_use</code></td><td>text</td><td>On-use effect description <em>(lazy)</em></td></tr><tr><td><code>flavor</code></td><td>text</td><td>Flavor text <em>(lazy)</em></td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="items">items<a class="anchor" href="#items" aria-label="Link to this part">#</a></h3>
+<p>Every item id in the game (scanned once per update; run SCAN items). Columns are read on demand. Kind: <strong>scan</strong>  ·  Key: <code>id</code></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>id</code></td><td>int</td><td>Item id</td></tr><tr><td><code>link</code></td><td>text</td><td>Item link (base quality, level 1)</td></tr><tr><td><code>name</code></td><td>text</td><td>Item name <em>(lazy)</em></td></tr><tr><td><code>icon</code></td><td>text</td><td>Icon <em>(lazy)</em></td></tr><tr><td><code>item_type</code></td><td>text</td><td>weapon, armor, potion, food, recipe, furnishing... <em>(lazy)</em></td></tr><tr><td><code>specialized_type</code></td><td>text</td><td>Specialized item type <em>(lazy)</em></td></tr><tr><td><code>quality</code></td><td>text</td><td>normal, magic, arcane, artifact, legendary, mythic_override <em>(lazy)</em></td></tr><tr><td><code>equip_type</code></td><td>text</td><td>head, chest, ring, one_hand... <em>(lazy)</em></td></tr><tr><td><code>armor_type</code></td><td>text</td><td>light, medium, heavy <em>(lazy)</em></td></tr><tr><td><code>weapon_type</code></td><td>text</td><td>sword, bow, fire_staff... <em>(lazy)</em></td></tr><tr><td><code>trait</code></td><td>text</td><td>Item trait <em>(lazy)</em></td></tr><tr><td><code>set_id</code></td><td>int</td><td>Item set id <em>(lazy)</em></td></tr><tr><td><code>set_name</code></td><td>text</td><td>Item set name <em>(lazy)</em></td></tr><tr><td><code>level</code></td><td>int</td><td>Required level <em>(lazy)</em></td></tr><tr><td><code>cp</code></td><td>int</td><td>Required champion points <em>(lazy)</em></td></tr><tr><td><code>value</code></td><td>int</td><td>Vendor value <em>(lazy)</em></td></tr><tr><td><code>bind_type</code></td><td>text</td><td>on_pickup, on_equip, ... <em>(lazy)</em></td></tr><tr><td><code>style</code></td><td>text</td><td>Motif style <em>(lazy)</em></td></tr><tr><td><code>unique</code></td><td>bool</td><td>Unique item <em>(lazy)</em></td></tr><tr><td><code>armor_rating</code></td><td>int</td><td>Armor rating <em>(lazy)</em></td></tr><tr><td><code>weapon_power</code></td><td>int</td><td>Weapon damage <em>(lazy)</em></td></tr><tr><td><code>on_use</code></td><td>text</td><td>On-use effect description <em>(lazy)</em></td></tr><tr><td><code>flavor</code></td><td>text</td><td>Flavor text <em>(lazy)</em></td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="inventory">inventory<a class="anchor" href="#inventory" aria-label="Link to this part">#</a></h3>
+<p>Items in your equipped slots, backpack, bank, craft bag and open house storage Kind: <strong>live</strong></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>bag</code></td><td>text</td><td>worn, backpack, bank, subscriber_bank, virtual (craft bag), house_bank_*</td></tr><tr><td><code>slot</code></td><td>int</td><td>Slot index</td></tr><tr><td><code>item_id</code></td><td>int</td><td>Item id</td></tr><tr><td><code>name</code></td><td>text</td><td>Item name</td></tr><tr><td><code>count</code></td><td>int</td><td>Stack size</td></tr><tr><td><code>link</code></td><td>text</td><td>Item link</td></tr><tr><td><code>equipped</code></td><td>bool</td><td>Worn by you</td></tr><tr><td><code>stolen</code></td><td>bool</td><td>Stolen <em>(lazy)</em></td></tr><tr><td><code>locked</code></td><td>bool</td><td>Player locked <em>(lazy)</em></td></tr><tr><td><code>bound</code></td><td>bool</td><td>Bound <em>(lazy)</em></td></tr><tr><td><code>bag_id</code></td><td>int</td><td>Bag id</td></tr><tr><td><code>icon</code></td><td>text</td><td>Icon <em>(lazy)</em></td></tr><tr><td><code>item_type</code></td><td>text</td><td>weapon, armor, potion, food, recipe, furnishing... <em>(lazy)</em></td></tr><tr><td><code>specialized_type</code></td><td>text</td><td>Specialized item type <em>(lazy)</em></td></tr><tr><td><code>quality</code></td><td>text</td><td>normal, magic, arcane, artifact, legendary, mythic_override <em>(lazy)</em></td></tr><tr><td><code>equip_type</code></td><td>text</td><td>head, chest, ring, one_hand... <em>(lazy)</em></td></tr><tr><td><code>armor_type</code></td><td>text</td><td>light, medium, heavy <em>(lazy)</em></td></tr><tr><td><code>weapon_type</code></td><td>text</td><td>sword, bow, fire_staff... <em>(lazy)</em></td></tr><tr><td><code>trait</code></td><td>text</td><td>Item trait <em>(lazy)</em></td></tr><tr><td><code>set_id</code></td><td>int</td><td>Item set id <em>(lazy)</em></td></tr><tr><td><code>set_name</code></td><td>text</td><td>Item set name <em>(lazy)</em></td></tr><tr><td><code>level</code></td><td>int</td><td>Required level <em>(lazy)</em></td></tr><tr><td><code>cp</code></td><td>int</td><td>Required champion points <em>(lazy)</em></td></tr><tr><td><code>value</code></td><td>int</td><td>Vendor value <em>(lazy)</em></td></tr><tr><td><code>bind_type</code></td><td>text</td><td>on_pickup, on_equip, ... <em>(lazy)</em></td></tr><tr><td><code>style</code></td><td>text</td><td>Motif style <em>(lazy)</em></td></tr><tr><td><code>unique</code></td><td>bool</td><td>Unique item <em>(lazy)</em></td></tr><tr><td><code>armor_rating</code></td><td>int</td><td>Armor rating <em>(lazy)</em></td></tr><tr><td><code>weapon_power</code></td><td>int</td><td>Weapon damage <em>(lazy)</em></td></tr><tr><td><code>on_use</code></td><td>text</td><td>On-use effect description <em>(lazy)</em></td></tr><tr><td><code>flavor</code></td><td>text</td><td>Flavor text <em>(lazy)</em></td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="character">character<a class="anchor" href="#character" aria-label="Link to this part">#</a></h3>
+<p>The character you are logged in on (one row) Kind: <strong>live</strong></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>name</code></td><td>text</td><td>Character name</td></tr><tr><td><code>account</code></td><td>text</td><td>@account</td></tr><tr><td><code>character_id</code></td><td>text</td><td>Character id</td></tr><tr><td><code>level</code></td><td>int</td><td>Level</td></tr><tr><td><code>cp</code></td><td>int</td><td>Champion points earned (account)</td></tr><tr><td><code>class</code></td><td>text</td><td>Class</td></tr><tr><td><code>class_id</code></td><td>int</td><td>Class id</td></tr><tr><td><code>race</code></td><td>text</td><td>Race</td></tr><tr><td><code>race_id</code></td><td>int</td><td>Race id</td></tr><tr><td><code>alliance</code></td><td>text</td><td>Alliance</td></tr><tr><td><code>zone</code></td><td>text</td><td>Current zone</td></tr><tr><td><code>zone_id</code></td><td>int</td><td>Current zone id</td></tr><tr><td><code>health_max</code></td><td>int</td><td>Max health</td></tr><tr><td><code>magicka_max</code></td><td>int</td><td>Max magicka</td></tr><tr><td><code>stamina_max</code></td><td>int</td><td>Max stamina</td></tr><tr><td><code>api_version</code></td><td>int</td><td>Game API version</td></tr><tr><td><code>console</code></td><td>bool</td><td>Running the console UI</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="characters">characters<a class="anchor" href="#characters" aria-label="Link to this part">#</a></h3>
+<p>Every character on this account and server Kind: <strong>live</strong></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>slot</code></td><td>int</td><td>Character select order</td></tr><tr><td><code>name</code></td><td>text</td><td>Name</td></tr><tr><td><code>class</code></td><td>text</td><td>Class</td></tr><tr><td><code>race</code></td><td>text</td><td>Race</td></tr><tr><td><code>level</code></td><td>int</td><td>Level</td></tr><tr><td><code>alliance</code></td><td>text</td><td>Alliance</td></tr><tr><td><code>id</code></td><td>text</td><td>Character id</td></tr><tr><td><code>location</code></td><td>text</td><td>Last zone</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="stats">stats<a class="anchor" href="#stats" aria-label="Link to this part">#</a></h3>
+<p>Your character sheet stats right now Kind: <strong>live</strong></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>stat</code></td><td>text</td><td>Stat name (lower case, without STAT_)</td></tr><tr><td><code>stat_id</code></td><td>int</td><td>DerivedStats enum value</td></tr><tr><td><code>value</code></td><td>int</td><td>Value with bonuses</td></tr><tr><td><code>base</code></td><td>int</td><td>Value without bonuses</td></tr><tr><td><code>label</code></td><td>text</td><td>Display name <em>(lazy)</em></td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="currencies">currencies<a class="anchor" href="#currencies" aria-label="Link to this part">#</a></h3>
+<p>Gold, AP, Tel Var, writ vouchers, transmute crystals... where you hold them Kind: <strong>live</strong></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>currency</code></td><td>text</td><td>Currency key</td></tr><tr><td><code>currency_id</code></td><td>int</td><td>CurrencyType value</td></tr><tr><td><code>name</code></td><td>text</td><td>Display name</td></tr><tr><td><code>carried</code></td><td>int</td><td>On this character</td></tr><tr><td><code>bank</code></td><td>int</td><td>In the bank</td></tr><tr><td><code>account</code></td><td>int</td><td>Account-wide</td></tr><tr><td><code>total</code></td><td>int</td><td>Sum</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="quests">quests<a class="anchor" href="#quests" aria-label="Link to this part">#</a></h3>
+<p>Quests in your journal Kind: <strong>live</strong></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>journal_index</code></td><td>int</td><td>Journal index</td></tr><tr><td><code>name</code></td><td>text</td><td>Quest name</td></tr><tr><td><code>type</code></td><td>text</td><td>QuestType</td></tr><tr><td><code>level</code></td><td>int</td><td>Quest level</td></tr><tr><td><code>zone</code></td><td>text</td><td>Zone</td></tr><tr><td><code>step</code></td><td>text</td><td>Current step text</td></tr><tr><td><code>background</code></td><td>text</td><td>Background text</td></tr><tr><td><code>tracked</code></td><td>bool</td><td>Tracked</td></tr><tr><td><code>completed</code></td><td>bool</td><td>Ready to turn in</td></tr><tr><td><code>repeat_type</code></td><td>text</td><td>QuestRepeatableType <em>(lazy)</em></td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="completed_quests">completed_quests<a class="anchor" href="#completed_quests" aria-label="Link to this part">#</a></h3>
+<p>Every quest this character has completed Kind: <strong>live</strong>  ·  Key: <code>id</code></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>id</code></td><td>int</td><td>Quest id</td></tr><tr><td><code>name</code></td><td>text</td><td>Quest name</td></tr><tr><td><code>type</code></td><td>text</td><td>QuestType</td></tr><tr><td><code>zone</code></td><td>text</td><td>Zone <em>(lazy)</em></td></tr><tr><td><code>repeat_type</code></td><td>text</td><td>QuestRepeatableType <em>(lazy)</em></td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="achievements">achievements<a class="anchor" href="#achievements" aria-label="Link to this part">#</a></h3>
+<p>Every achievement with points, completion and rewards Kind: <strong>live</strong>  ·  Key: <code>id</code></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>id</code></td><td>int</td><td>Achievement id</td></tr><tr><td><code>name</code></td><td>text</td><td>Name</td></tr><tr><td><code>description</code></td><td>text</td><td>Description</td></tr><tr><td><code>points</code></td><td>int</td><td>Achievement points</td></tr><tr><td><code>completed</code></td><td>bool</td><td>Completed</td></tr><tr><td><code>date</code></td><td>text</td><td>Completion date</td></tr><tr><td><code>category</code></td><td>text</td><td>Top category</td></tr><tr><td><code>subcategory</code></td><td>text</td><td>Subcategory</td></tr><tr><td><code>icon</code></td><td>text</td><td>Icon</td></tr><tr><td><code>num_criteria</code></td><td>int</td><td>Number of criteria <em>(lazy)</em></td></tr><tr><td><code>reward_title</code></td><td>text</td><td>Title reward <em>(lazy)</em></td></tr><tr><td><code>reward_collectible_id</code></td><td>int</td><td>Collectible reward <em>(lazy)</em></td></tr><tr><td><code>reward_dye_id</code></td><td>int</td><td>Dye reward <em>(lazy)</em></td></tr><tr><td><code>reward_item</code></td><td>text</td><td>Item reward <em>(lazy)</em></td></tr><tr><td><code>link</code></td><td>text</td><td>Chat link <em>(lazy)</em></td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="achievement_criteria">achievement_criteria<a class="anchor" href="#achievement_criteria" aria-label="Link to this part">#</a></h3>
+<p>Progress on each achievement criterion Kind: <strong>live</strong></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>achievement_id</code></td><td>int</td><td>Achievement id</td></tr><tr><td><code>achievement</code></td><td>text</td><td>Achievement name</td></tr><tr><td><code>criterion_index</code></td><td>int</td><td>Criterion number</td></tr><tr><td><code>description</code></td><td>text</td><td>What to do</td></tr><tr><td><code>completed</code></td><td>int</td><td>Progress</td></tr><tr><td><code>required</code></td><td>int</td><td>Needed</td></tr><tr><td><code>done</code></td><td>bool</td><td>Criterion complete</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="collectibles">collectibles<a class="anchor" href="#collectibles" aria-label="Link to this part">#</a></h3>
+<p>Mounts, pets, costumes, houses, mementos, emotes, skill styles... with unlock state Kind: <strong>live</strong>  ·  Key: <code>id</code></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>id</code></td><td>int</td><td>Collectible id</td></tr><tr><td><code>name</code></td><td>text</td><td>Name</td></tr><tr><td><code>category_type</code></td><td>text</td><td>mount, vanity_pet, costume, house, memento, ...</td></tr><tr><td><code>category</code></td><td>text</td><td>Collections category <em>(lazy)</em></td></tr><tr><td><code>unlocked</code></td><td>bool</td><td>Unlocked on this account</td></tr><tr><td><code>active</code></td><td>bool</td><td>Active now</td></tr><tr><td><code>purchasable</code></td><td>bool</td><td>Sold in the Crown Store</td></tr><tr><td><code>description</code></td><td>text</td><td>Description <em>(lazy)</em></td></tr><tr><td><code>hint</code></td><td>text</td><td>Where to get it <em>(lazy)</em></td></tr><tr><td><code>icon</code></td><td>text</td><td>Icon</td></tr><tr><td><code>nickname</code></td><td>text</td><td>Your nickname <em>(lazy)</em></td></tr><tr><td><code>reference_id</code></td><td>int</td><td>Referenced id (house id, ...) <em>(lazy)</em></td></tr><tr><td><code>linked_achievement</code></td><td>int</td><td>Achievement that grants it <em>(lazy)</em></td></tr><tr><td><code>link</code></td><td>text</td><td>Chat link <em>(lazy)</em></td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="titles">titles<a class="anchor" href="#titles" aria-label="Link to this part">#</a></h3>
+<p>Titles you have earned Kind: <strong>live</strong></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>title_index</code></td><td>int</td><td>Index</td></tr><tr><td><code>name</code></td><td>text</td><td>Title</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="dyes">dyes<a class="anchor" href="#dyes" aria-label="Link to this part">#</a></h3>
+<p>Every dye with colour and unlock state Kind: <strong>live</strong>  ·  Key: <code>id</code></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>id</code></td><td>int</td><td>Dye id</td></tr><tr><td><code>name</code></td><td>text</td><td>Dye name</td></tr><tr><td><code>known</code></td><td>bool</td><td>Unlocked</td></tr><tr><td><code>rarity</code></td><td>text</td><td>common, uncommon, rare, material...</td></tr><tr><td><code>hue</code></td><td>text</td><td>Hue category</td></tr><tr><td><code>achievement_id</code></td><td>int</td><td>Achievement that unlocks it</td></tr><tr><td><code>r</code></td><td>num</td><td>Red 0-1</td></tr><tr><td><code>g</code></td><td>num</td><td>Green 0-1</td></tr><tr><td><code>b</code></td><td>num</td><td>Blue 0-1</td></tr><tr><td><code>hex</code></td><td>text</td><td>RRGGBB</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="emotes">emotes<a class="anchor" href="#emotes" aria-label="Link to this part">#</a></h3>
+<p>Every emote with its slash command Kind: <strong>static</strong>  ·  Key: <code>id</code></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>id</code></td><td>int</td><td>Emote id</td></tr><tr><td><code>emote_index</code></td><td>int</td><td>Index</td></tr><tr><td><code>slash</code></td><td>text</td><td>Slash command</td></tr><tr><td><code>name</code></td><td>text</td><td>Display name</td></tr><tr><td><code>category</code></td><td>text</td><td>EmoteCategory</td></tr><tr><td><code>collectible_id</code></td><td>int</td><td>Collectible that unlocks it <em>(lazy)</em></td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="lore_books">lore_books<a class="anchor" href="#lore_books" aria-label="Link to this part">#</a></h3>
+<p>Lore library books (Eidetic Memory, Shalidor's Library, crafting motifs...) Kind: <strong>live</strong></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>book_id</code></td><td>int</td><td>Book id</td></tr><tr><td><code>title</code></td><td>text</td><td>Title</td></tr><tr><td><code>known</code></td><td>bool</td><td>You have read it</td></tr><tr><td><code>category</code></td><td>text</td><td>Library category</td></tr><tr><td><code>collection</code></td><td>text</td><td>Collection</td></tr><tr><td><code>category_index</code></td><td>int</td><td>Category index</td></tr><tr><td><code>collection_index</code></td><td>int</td><td>Collection index</td></tr><tr><td><code>book_index</code></td><td>int</td><td>Book index</td></tr><tr><td><code>icon</code></td><td>text</td><td>Icon</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="antiquities">antiquities<a class="anchor" href="#antiquities" aria-label="Link to this part">#</a></h3>
+<p>Antiquities with quality, difficulty, zone and progress Kind: <strong>live</strong>  ·  Key: <code>id</code></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>id</code></td><td>int</td><td>Antiquity id</td></tr><tr><td><code>name</code></td><td>text</td><td>Name</td></tr><tr><td><code>quality</code></td><td>text</td><td>AntiquityQuality</td></tr><tr><td><code>difficulty</code></td><td>text</td><td>AntiquityDifficulty</td></tr><tr><td><code>zone_id</code></td><td>int</td><td>Zone id</td></tr><tr><td><code>zone</code></td><td>text</td><td>Zone name</td></tr><tr><td><code>set_name</code></td><td>text</td><td>Antiquity set (mythic, furnishing set...)</td></tr><tr><td><code>category</code></td><td>text</td><td>Category</td></tr><tr><td><code>recovered</code></td><td>int</td><td>Times recovered</td></tr><tr><td><code>lore_found</code></td><td>int</td><td>Lore entries found</td></tr><tr><td><code>lore_total</code></td><td>int</td><td>Lore entries</td></tr><tr><td><code>reward_id</code></td><td>int</td><td>Reward id</td></tr><tr><td><code>icon</code></td><td>text</td><td>Icon</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="recipes">recipes<a class="anchor" href="#recipes" aria-label="Link to this part">#</a></h3>
+<p>Provisioning and furnishing recipes with result items and whether you know them Kind: <strong>live</strong></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>list</code></td><td>text</td><td>Recipe list</td></tr><tr><td><code>list_index</code></td><td>int</td><td>List index</td></tr><tr><td><code>recipe_index</code></td><td>int</td><td>Recipe index</td></tr><tr><td><code>name</code></td><td>text</td><td>Recipe name</td></tr><tr><td><code>known</code></td><td>bool</td><td>Known</td></tr><tr><td><code>num_ingredients</code></td><td>int</td><td>Ingredients</td></tr><tr><td><code>skill_required</code></td><td>int</td><td>Provisioner rank needed</td></tr><tr><td><code>quality_required</code></td><td>int</td><td>Recipe quality rank needed</td></tr><tr><td><code>station</code></td><td>text</td><td>Crafting station</td></tr><tr><td><code>result_link</code></td><td>text</td><td>Result item link <em>(lazy)</em></td></tr><tr><td><code>ingredients</code></td><td>text</td><td>Ingredients <em>(lazy)</em></td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="guilds">guilds<a class="anchor" href="#guilds" aria-label="Link to this part">#</a></h3>
+<p>Your guilds Kind: <strong>live</strong></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>id</code></td><td>int</td><td>Guild id</td></tr><tr><td><code>name</code></td><td>text</td><td>Guild name</td></tr><tr><td><code>members</code></td><td>int</td><td>Member count</td></tr><tr><td><code>guild_index</code></td><td>int</td><td>Index</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="guild_members">guild_members<a class="anchor" href="#guild_members" aria-label="Link to this part">#</a></h3>
+<p>Members of all your guilds Kind: <strong>live</strong></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>guild</code></td><td>text</td><td>Guild name</td></tr><tr><td><code>guild_id</code></td><td>int</td><td>Guild id</td></tr><tr><td><code>account</code></td><td>text</td><td>@account</td></tr><tr><td><code>note</code></td><td>text</td><td>Member note</td></tr><tr><td><code>rank_index</code></td><td>int</td><td>Guild rank index</td></tr><tr><td><code>status</code></td><td>text</td><td>online, away, offline...</td></tr><tr><td><code>offline_seconds</code></td><td>int</td><td>Seconds since last online</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="friends">friends<a class="anchor" href="#friends" aria-label="Link to this part">#</a></h3>
+<p>Your friends list Kind: <strong>live</strong></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>account</code></td><td>text</td><td>@account</td></tr><tr><td><code>note</code></td><td>text</td><td>Note</td></tr><tr><td><code>status</code></td><td>text</td><td>online, away, offline...</td></tr><tr><td><code>offline_seconds</code></td><td>int</td><td>Seconds since last online</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="group_members">group_members<a class="anchor" href="#group_members" aria-label="Link to this part">#</a></h3>
+<p>Your group members Kind: <strong>live</strong></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>unit</code></td><td>text</td><td>Unit tag</td></tr><tr><td><code>name</code></td><td>text</td><td>Character name</td></tr><tr><td><code>account</code></td><td>text</td><td>@account</td></tr><tr><td><code>class</code></td><td>text</td><td>Class</td></tr><tr><td><code>role</code></td><td>text</td><td>dps, tank, heal</td></tr><tr><td><code>level</code></td><td>int</td><td>Level</td></tr><tr><td><code>cp</code></td><td>int</td><td>Champion points</td></tr><tr><td><code>zone</code></td><td>text</td><td>Zone</td></tr><tr><td><code>online</code></td><td>bool</td><td>Online</td></tr><tr><td><code>leader</code></td><td>bool</td><td>Group leader</td></tr><tr><td><code>health</code></td><td>int</td><td>Current health</td></tr><tr><td><code>health_max</code></td><td>int</td><td>Max health</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="zones">zones<a class="anchor" href="#zones" aria-label="Link to this part">#</a></h3>
+<p>Every zone: name, parent zone, description, POI and skyshard counts Kind: <strong>static</strong>  ·  Key: <code>id</code></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>id</code></td><td>int</td><td>Zone id</td></tr><tr><td><code>zone_index</code></td><td>int</td><td>Zone index</td></tr><tr><td><code>name</code></td><td>text</td><td>Zone name</td></tr><tr><td><code>parent_zone_id</code></td><td>int</td><td>Parent zone id</td></tr><tr><td><code>parent_zone</code></td><td>text</td><td>Parent zone name</td></tr><tr><td><code>num_pois</code></td><td>int</td><td>Points of interest</td></tr><tr><td><code>num_skyshards</code></td><td>int</td><td>Skyshards <em>(lazy)</em></td></tr><tr><td><code>collectible_id</code></td><td>int</td><td>DLC collectible that unlocks it <em>(lazy)</em></td></tr><tr><td><code>story_zone_id</code></td><td>int</td><td>Zone story zone id <em>(lazy)</em></td></tr><tr><td><code>description</code></td><td>text</td><td>Description <em>(lazy)</em></td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="pois">pois<a class="anchor" href="#pois" aria-label="Link to this part">#</a></h3>
+<p>Points of interest in every zone (wayshrines, dungeons, delves, skyshards...) Kind: <strong>static</strong></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>zone_id</code></td><td>int</td><td>Zone id</td></tr><tr><td><code>zone</code></td><td>text</td><td>Zone name</td></tr><tr><td><code>zone_index</code></td><td>int</td><td>Zone index</td></tr><tr><td><code>poi_index</code></td><td>int</td><td>POI index in the zone</td></tr><tr><td><code>name</code></td><td>text</td><td>Name</td></tr><tr><td><code>type</code></td><td>text</td><td>PointOfInterestType</td></tr><tr><td><code>instance_type</code></td><td>text</td><td>InstanceType <em>(lazy)</em></td></tr><tr><td><code>skyshard_id</code></td><td>int</td><td>Skyshard id <em>(lazy)</em></td></tr><tr><td><code>level</code></td><td>int</td><td>Objective level</td></tr><tr><td><code>start_text</code></td><td>text</td><td>Start description</td></tr><tr><td><code>finished_text</code></td><td>text</td><td>Finished description</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="wayshrines">wayshrines<a class="anchor" href="#wayshrines" aria-label="Link to this part">#</a></h3>
+<p>Fast-travel nodes (wayshrines, dungeons, trials, houses) and whether you know them Kind: <strong>live</strong></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>node_index</code></td><td>int</td><td>Fast travel node index</td></tr><tr><td><code>name</code></td><td>text</td><td>Name</td></tr><tr><td><code>known</code></td><td>bool</td><td>Discovered</td></tr><tr><td><code>type</code></td><td>text</td><td>PointOfInterestType</td></tr><tr><td><code>x</code></td><td>num</td><td>Normalized map x</td></tr><tr><td><code>y</code></td><td>num</td><td>Normalized map y</td></tr><tr><td><code>house_id</code></td><td>int</td><td>House id for houses <em>(lazy)</em></td></tr><tr><td><code>zone_id</code></td><td>int</td><td>Zone id <em>(lazy)</em></td></tr><tr><td><code>icon</code></td><td>text</td><td>Map icon</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="activities">activities<a class="anchor" href="#activities" aria-label="Link to this part">#</a></h3>
+<p>Group finder activities: dungeons, trials, battlegrounds, arenas... Kind: <strong>static</strong>  ·  Key: <code>id</code></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>id</code></td><td>int</td><td>Activity id</td></tr><tr><td><code>name</code></td><td>text</td><td>Name</td></tr><tr><td><code>type</code></td><td>text</td><td>LFGActivity: dungeon, master_dungeon, trial, battle_ground_*...</td></tr><tr><td><code>min_level</code></td><td>int</td><td>Minimum level</td></tr><tr><td><code>max_level</code></td><td>int</td><td>Maximum level</td></tr><tr><td><code>min_cp</code></td><td>int</td><td>Minimum champion points</td></tr><tr><td><code>max_cp</code></td><td>int</td><td>Maximum champion points</td></tr><tr><td><code>group_type</code></td><td>text</td><td>LFGGroupType</td></tr><tr><td><code>min_group_size</code></td><td>int</td><td>Minimum group size</td></tr><tr><td><code>zone_id</code></td><td>int</td><td>Zone id <em>(lazy)</em></td></tr><tr><td><code>description</code></td><td>text</td><td>Description</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="classes">classes<a class="anchor" href="#classes" aria-label="Link to this part">#</a></h3>
+<p>Playable classes and their skill lines Kind: <strong>static</strong>  ·  Key: <code>id</code></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>id</code></td><td>int</td><td>Class id</td></tr><tr><td><code>name</code></td><td>text</td><td>Class name</td></tr><tr><td><code>selectable</code></td><td>bool</td><td>Selectable at character creation</td></tr><tr><td><code>num_skill_lines</code></td><td>int</td><td>Class skill lines</td></tr><tr><td><code>skill_lines</code></td><td>text</td><td>Skill line names</td></tr><tr><td><code>collectible_id</code></td><td>int</td><td>Collectible that unlocks the class</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="class_skill_lines">class_skill_lines<a class="anchor" href="#class_skill_lines" aria-label="Link to this part">#</a></h3>
+<p>Skill lines of every class, including classes you don't play Kind: <strong>static</strong>  ·  Key: <code>id</code></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>id</code></td><td>int</td><td>Skill line id</td></tr><tr><td><code>name</code></td><td>text</td><td>Skill line name</td></tr><tr><td><code>class_id</code></td><td>int</td><td>Class id</td></tr><tr><td><code>class</code></td><td>text</td><td>Class name</td></tr><tr><td><code>line_number</code></td><td>int</td><td>1-3 within the class</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="races">races<a class="anchor" href="#races" aria-label="Link to this part">#</a></h3>
+<p>Playable races Kind: <strong>static</strong>  ·  Key: <code>id</code></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>id</code></td><td>int</td><td>Race id</td></tr><tr><td><code>name</code></td><td>text</td><td>Race name</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="maps">maps<a class="anchor" href="#maps" aria-label="Link to this part">#</a></h3>
+<p>World maps Kind: <strong>static</strong>  ·  Key: <code>map_index</code></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>map_index</code></td><td>int</td><td>Map index</td></tr><tr><td><code>name</code></td><td>text</td><td>Map name</td></tr><tr><td><code>map_type</code></td><td>text</td><td>UIMapType</td></tr><tr><td><code>content_type</code></td><td>text</td><td>MapContentType</td></tr><tr><td><code>zone_index</code></td><td>int</td><td>Zone index</td></tr><tr><td><code>zone_id</code></td><td>int</td><td>Zone id</td></tr><tr><td><code>description</code></td><td>text</td><td>Description</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="tables-1">tables<a class="anchor" href="#tables-1" aria-label="Link to this part">#</a></h3>
+<p>Every table you can query Kind: <strong>live</strong>  ·  Key: <code>name</code></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>name</code></td><td>text</td><td>Table name</td></tr><tr><td><code>kind</code></td><td>text</td><td>static (cached), live (read every query), scan (id index), user (yours)</td></tr><tr><td><code>description</code></td><td>text</td><td>What is in it</td></tr><tr><td><code>num_columns</code></td><td>int</td><td>Column count</td></tr><tr><td><code>key</code></td><td>text</td><td>Primary key column</td></tr><tr><td><code>rows_cached</code></td><td>int</td><td>Rows in memory or ids indexed (NULL until first use)</td></tr><tr><td><code>builtin</code></td><td>bool</td><td>Comes with LibESQL; always read-only</td></tr><tr><td><code>writable</code></td><td>bool</td><td>INSERT / UPDATE / DELETE allowed (tables you created)</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="columns">columns<a class="anchor" href="#columns" aria-label="Link to this part">#</a></h3>
+<p>Every column of every table Kind: <strong>live</strong></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>table_name</code></td><td>text</td><td>Table</td></tr><tr><td><code>column_name</code></td><td>text</td><td>Column</td></tr><tr><td><code>position</code></td><td>int</td><td>Column order</td></tr><tr><td><code>type</code></td><td>text</td><td>int, num, text, bool</td></tr><tr><td><code>description</code></td><td>text</td><td>Meaning</td></tr><tr><td><code>lazy</code></td><td>bool</td><td>Computed when read</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="constants">constants<a class="anchor" href="#constants" aria-label="Link to this part">#</a></h3>
+<p>Every numeric game constant (enums, flags, limits) except SI_ string ids Kind: <strong>static</strong>  ·  Key: <code>name</code></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>name</code></td><td>text</td><td>Constant name</td></tr><tr><td><code>value</code></td><td>num</td><td>Value</td></tr><tr><td><code>family</code></td><td>text</td><td>Name without its last word (ACTION_RESULT_DAMAGE -&gt; ACTION_RESULT)</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="events">events<a class="anchor" href="#events" aria-label="Link to this part">#</a></h3>
+<p>Every EVENT_* id Kind: <strong>static</strong>  ·  Key: <code>name</code></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>name</code></td><td>text</td><td>Event name</td></tr><tr><td><code>id</code></td><td>int</td><td>Event id</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="strings">strings<a class="anchor" href="#strings" aria-label="Link to this part">#</a></h3>
+<p>Every localized string (SI_* ids) in your game language Kind: <strong>static</strong>  ·  Key: <code>name</code></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>name</code></td><td>text</td><td>String id name</td></tr><tr><td><code>id</code></td><td>int</td><td>String id</td></tr><tr><td><code>text</code></td><td>text</td><td>Localized text <em>(lazy)</em></td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="functions">functions<a class="anchor" href="#functions" aria-label="Link to this part">#</a></h3>
+<p>Every global function (game API and add-on functions) Kind: <strong>static</strong>  ·  Key: <code>name</code></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>name</code></td><td>text</td><td>Function name</td></tr><tr><td><code>kind</code></td><td>text</td><td>api (from the game, PascalCase) or lua (other)</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="sounds">sounds<a class="anchor" href="#sounds" aria-label="Link to this part">#</a></h3>
+<p>Every entry in the SOUNDS table (PlaySound names) Kind: <strong>static</strong>  ·  Key: <code>name</code></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>name</code></td><td>text</td><td>SOUNDS key</td></tr><tr><td><code>value</code></td><td>text</td><td>Sound id</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="saved_variables">saved_variables<a class="anchor" href="#saved_variables" aria-label="Link to this part">#</a></h3>
+<p>Other add-ons' SavedVariables found in memory (read-only; SCAN savedvariables to refresh) Kind: <strong>live</strong>  ·  Key: <code>name</code></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>name</code></td><td>text</td><td>Global name of the saved variable</td></tr><tr><td><code>addon</code></td><td>text</td><td>Add-on it most likely belongs to (guessed from the name)</td></tr><tr><td><code>style</code></td><td>text</td><td>ZO_SavedVars, or registered (added with LibESQL.AddSavedVariable)</td></tr><tr><td><code>accounts</code></td><td>int</td><td>Accounts with data</td></tr><tr><td><code>characters</code></td><td>int</td><td>Characters with their own data</td></tr><tr><td><code>account_wide</code></td><td>bool</td><td>Has account-wide data</td></tr><tr><td><code>tables</code></td><td>int</td><td>Tables generated from it</td></tr><tr><td><code>tables_list</code></td><td>text</td><td>Names of those tables</td></tr><tr><td><code>nodes</code></td><td>int</td><td>Tables inside it that were looked at</td></tr><tr><td><code>truncated</code></td><td>bool</td><td>Too big to look through completely</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="sv_tables">sv_tables<a class="anchor" href="#sv_tables" aria-label="Link to this part">#</a></h3>
+<p>Tables made from other add-ons' SavedVariables (each list of records becomes a table) Kind: <strong>live</strong>  ·  Key: <code>table_name</code></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>table_name</code></td><td>text</td><td>Query it: SELECT * FROM &lt;table_name&gt;</td></tr><tr><td><code>sv</code></td><td>text</td><td>Saved variable it comes from</td></tr><tr><td><code>addon</code></td><td>text</td><td>Add-on it most likely belongs to</td></tr><tr><td><code>pattern</code></td><td>text</td><td>Where the list is inside the saved variable (* = any key)</td></tr><tr><td><code>records</code></td><td>int</td><td>Records when it was found</td></tr><tr><td><code>columns</code></td><td>int</td><td>Columns</td></tr></tbody></table></div>
+</div>
+<div class="block">
+<h3 id="sv_values">sv_values<a class="anchor" href="#sv_values" aria-label="Link to this part">#</a></h3>
+<p>Every value in other add-ons' SavedVariables, one row per value (filter with WHERE sv = '...') Kind: <strong>live</strong></p>
+<div class="table"><table><thead><tr><th>Column</th><th>Type</th><th>Description</th></tr></thead><tbody><tr><td><code>sv</code></td><td>text</td><td>Saved variable</td></tr><tr><td><code>addon</code></td><td>text</td><td>Add-on it most likely belongs to</td></tr><tr><td><code>account</code></td><td>text</td><td>@account</td></tr><tr><td><code>scope</code></td><td>text</td><td>Character name, or account-wide</td></tr><tr><td><code>path</code></td><td>text</td><td>Path inside the data, e.g. settings.window.x</td></tr><tr><td><code>key</code></td><td>text</td><td>Last part of the path</td></tr><tr><td><code>value</code></td><td>any</td><td>The value</td></tr><tr><td><code>type</code></td><td>text</td><td>string, number or boolean</td></tr><tr><td><code>depth</code></td><td>int</td><td>How deep it is</td></tr></tbody></table></div>
+<hr>
+<p>MIT License. See <a href="LICENSE">LICENSE</a>.</p>
+</div>
+</section>
+<p class="none" id="none">Nothing matches. Try fewer or shorter words.</p>
+<footer>Generated from API Reference.md by tools/make_api_html.py. MIT licensed.</footer>
+</main>
+</div>
+<script>
+(function(){
+  var root=document.documentElement;
+  try{var t=localStorage.getItem('libesql-theme');if(t)root.setAttribute('data-theme',t);}catch(e){}
+  document.getElementById('theme').addEventListener('click',function(){
+    var dark=root.getAttribute('data-theme')==='dark'||(!root.getAttribute('data-theme')&&matchMedia('(prefers-color-scheme: dark)').matches);
+    var next=dark?'light':'dark';root.setAttribute('data-theme',next);try{localStorage.setItem('libesql-theme',next);}catch(e){}
+  });
+  // copy buttons
+  document.querySelectorAll('.copy').forEach(function(b){
+    b.addEventListener('click',function(){
+      var text=b.parentNode.querySelector('code').innerText;
+      function done(){b.textContent='Copied';setTimeout(function(){b.textContent='Copy';},1400);}
+      if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(done,fallback);}else{fallback();}
+      function fallback(){var ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();
+        try{document.execCommand('copy');done();}catch(e){b.textContent='Select + Ctrl+C';}document.body.removeChild(ta);}
+    });
+  });
+  // search: hide sections that don't contain the words, mark matches
+  var input=document.getElementById('q'),count=document.getElementById('count'),none=document.getElementById('none');
+  var blocks=[].slice.call(document.querySelectorAll('main .block'));
+  var tocLinks={};document.querySelectorAll('.toc a').forEach(function(a){tocLinks[a.getAttribute('href').slice(1)]=a;});
+  blocks.forEach(function(b){b._text=b.textContent.toLowerCase();});
+  function unmark(){document.querySelectorAll('main mark').forEach(function(m){var p=m.parentNode;p.replaceChild(document.createTextNode(m.textContent),m);p.normalize();});}
+  function markIn(el,words){
+    var walker=document.createTreeWalker(el,NodeFilter.SHOW_TEXT,null),nodes=[],n;
+    while((n=walker.nextNode())){if(n.parentNode.closest('button'))continue;nodes.push(n);}
+    nodes.forEach(function(node){
+      var text=node.nodeValue,low=text.toLowerCase(),hits=[];
+      words.forEach(function(w){var i=low.indexOf(w);while(i>=0){hits.push([i,i+w.length]);i=low.indexOf(w,i+w.length);}});
+      if(!hits.length)return;hits.sort(function(a,b){return a[0]-b[0];});
+      var frag=document.createDocumentFragment(),pos=0;
+      hits.forEach(function(h){if(h[0]<pos)return;frag.appendChild(document.createTextNode(text.slice(pos,h[0])));
+        var m=document.createElement('mark');m.textContent=text.slice(h[0],h[1]);frag.appendChild(m);pos=h[1];});
+      frag.appendChild(document.createTextNode(text.slice(pos)));node.parentNode.replaceChild(frag,node);
+    });
+  }
+  var timer;
+  input.addEventListener('input',function(){clearTimeout(timer);timer=setTimeout(run,120);});
+  function run(){
+    unmark();
+    var q=input.value.trim().toLowerCase(),words=q.split(/\s+/).filter(Boolean),shown=0;
+    blocks.forEach(function(b){
+      var ok=!words.length||words.every(function(w){return b._text.indexOf(w)>=0;});
+      b.classList.toggle('hidden',!ok);if(ok&&words.length){shown++;markIn(b,words);}
+    });
+    // a section heading stays when anything below it matches
+    document.querySelectorAll('main section').forEach(function(s){
+      var any=[].some.call(s.querySelectorAll('.block'),function(b){return !b.classList.contains('hidden');});
+      s.classList.toggle('hidden',!any);
+    });
+    Object.keys(tocLinks).forEach(function(id){
+      var el=document.getElementById(id),li=tocLinks[id].closest('li');
+      // a section (h2) stays listed while anything inside it matches; a part (h3) when its own block does
+      var vis=el&&(el.tagName==='H2'?!el.closest('section').classList.contains('hidden'):!el.closest('.hidden'));
+      if(li)li.classList.toggle('hide',!vis);
+      if(words.length&&vis){var d=li&&li.closest('details');if(d)d.open=true;}
+    });
+    count.textContent=words.length?(shown+' matching part'+(shown===1?'':'s')):'';
+    none.style.display=words.length&&!shown?'block':'none';
+  }
+  document.addEventListener('keydown',function(e){
+    if(e.key==='/'&&document.activeElement!==input){e.preventDefault();input.focus();input.select();}
+    else if(e.key==='Escape'&&document.activeElement===input){input.value='';run();input.blur();}
+  });
+  // highlight where you are in the contents
+  var heads=[].slice.call(document.querySelectorAll('main h2[id],main h3[id]'));
+  if('IntersectionObserver' in window){
+    var current;var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){
+      if(current)current.classList.remove('on');current=tocLinks[e.target.id];if(current)current.classList.add('on');}});},{rootMargin:'0px 0px -75% 0px'});
+    heads.forEach(function(h){io.observe(h);});
+  }
+  // mobile menu
+  var nav=document.querySelector('nav');document.getElementById('menu').addEventListener('click',function(){nav.classList.toggle('open');});
+  nav.addEventListener('click',function(e){if(e.target.tagName==='A'&&innerWidth<=900)nav.classList.remove('open');});
+  document.getElementById('expand').addEventListener('click',function(){var d=document.querySelectorAll('.toc details'),open=[].some.call(d,function(x){return !x.open;});d.forEach(function(x){x.open=open;});});
+})();
+</script>
+</body>
+</html>

@@ -28,7 +28,7 @@ Slash commands work on PC/Mac only. For console, start from **ConsolePanel**.
 
 ## Tips
 
-- Put player text into a query with `?` parameters, never by joining strings: `LibESQL.Select("... WHERE name LIKE ?", { "%" .. text .. "%" })`.
+- Put player text into a query with `?` parameters, never by joining strings. For a `LIKE` search, also escape it, so a `%` or `_` the player typed matches itself: `LibESQL.Select("... WHERE name LIKE ? ESCAPE '\\'", { "%" .. LibESQL.Escape(text) .. "%" })`.
 - The first query on `abilities` or `items` scans every id. Run it with `QueryAsync` or `Scan`. Afterwards the index is saved until the next game update.
 - `SHOW TABLES` and `DESCRIBE <table>` (or `LibESQL.GetColumns`) list what you can query.
 - Keep your add-on's own data in a table you create (see SavedData). It is saved in `LibESQL_SV` and every add-on, and the ESQL window, can query it.

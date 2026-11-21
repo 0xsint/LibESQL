@@ -14,9 +14,9 @@ SLASH_COMMANDS["/setsearch"] = function(text)
         SELECT s.name, s.set_type, b.description
         FROM sets s
         JOIN set_bonuses b ON b.set_id = s.id
-        WHERE b.num_required = s.max_equipped AND b.description LIKE ?
+        WHERE b.num_required = s.max_equipped AND b.description LIKE ? ESCAPE '\'
         ORDER BY s.set_type, s.name
-        LIMIT 15]], { "%" .. text .. "%" })
+        LIMIT 15]], { "%" .. LibESQL.Escape(text) .. "%" })
     if not rows then Print("Error: %s", err) return end
     Print("%d set(s) with '%s' in the full bonus:", #rows, text)
     for _, r in ipairs(rows) do Print("  %s (%s): %s", r.name, r.set_type or "?", r.description) end

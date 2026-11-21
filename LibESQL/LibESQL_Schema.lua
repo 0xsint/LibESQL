@@ -122,6 +122,17 @@ function E.RegisterTable(def)
     return def
 end
 
+-- Remove a table that isn't built in (used for tables made from SavedVariables).
+function E.UnregisterTable(name)
+    name = lower(name or "")
+    if builtinNames[name] or not E.tables[name] then return false end
+    E.tables[name] = nil
+    for i, n in ipairs(E.tableOrder) do
+        if n == name then table.remove(E.tableOrder, i); break end
+    end
+    return true
+end
+
 function E.GetTable(name)
     return E.tables[lower(name)]
 end
@@ -343,7 +354,8 @@ local function saveUserTable(def)
         end
         saved[r] = arr
     end
-    E.sv.userTables[def.name] = { columns = colNames, types = types, rows = saved, desc = def.desc }
+    E.sv.userTables[def.name] = { columns = colNames, types = types, rows = saved, desc = def.desc,
+        primaryKey = def.primaryKey }
 end
 
 local function registerUserTable(name, cols, rows, desc)
@@ -377,7 +389,7 @@ local TYPE_ALIASES = {
 
 -- CREATE TABLE: cols = { {name = "x", type = "int"}, ... }
 -- Returns def, created (false when it already existed and ifNotExists was set).
-function E.CreateEmptyUserTable(name, cols, ifNotExists)
+function E.CreateEmptyUserTable(name, cols, ifNotExists, primaryKey)
     name = lower(name)
     checkFreeForUserTable(name)
     local existing = E.tables[name]
@@ -386,11 +398,31 @@ function E.CreateEmptyUserTable(name, cols, ifNotExists)
         E.SQL.Fail("table '%s' already exists (DROP TABLE it first, or use IF NOT EXISTS)", name)
     end
     if #cols == 0 then E.SQL.Fail("CREATE TABLE needs at least one column") end
-    local defCols = {}
+    local defCols, have = {}, {}
+    local pk = {}
     for i, c in ipairs(cols) do
-        defCols[i] = { name = lower(c.name), type = TYPE_ALIASES[c.type or ""] or "any", desc = "" }
+        local key = lower(c.name)
+        if have[key] then E.SQL.Fail("column '%s' is listed twice", key) end
+        have[key] = true
+        defCols[i] = { name = key, type = TYPE_ALIASES[c.type or ""] or "any", desc = "" }
+        if c.primary then pk[#pk + 1] = key end
+    end
+    if primaryKey and #primaryKey > 0 then
+        if #pk > 0 then E.SQL.Fail("PRIMARY KEY is given twice") end
+        for _, k in ipairs(primaryKey) do
+            k = lower(k)
+            if not have[k] then E.SQL.Fail("PRIMARY KEY names column '%s', which the table doesn't have", k) end
+            for _, existing in ipairs(pk) do
+                if existing == k then E.SQL.Fail("column '%s' is in the PRIMARY KEY twice", k) end
+            end
+            pk[#pk + 1] = k
+        end
+    end
+    for _, c in ipairs(defCols) do
+        for _, k in ipairs(pk) do if c.name == k then c.desc = "primary key" end end
     end
     local def = registerUserTable(name, defCols, {}, format("your table (created %s)", stamp()))
+    if #pk > 0 then def.primaryKey = pk end
     saveUserTable(def)
     E.FireCallbacks("UserTableCreated", name)
     return def, true
@@ -417,6 +449,90 @@ local function coerce(v, colType)
     return v
 end
 
+E.CoerceValue = coerce
+
+-- A row object with every column converted to the column's type.
+function E.CoerceRow(def, obj)
+    local row = {}
+    for _, c in ipairs(def.columns) do
+        local v = obj[c.key]
+        if v == E.NULL then v = nil end
+        row[c.key] = coerce(v, c.type)
+    end
+    return row
+end
+
+-- Identity of a row for the given key columns (strings compare without case,
+-- like "="); nil when any part is NULL (NULLs never conflict).
+function E.RowKey(row, cols)
+    local parts = {}
+    for i, k in ipairs(cols) do
+        local v = row[k]
+        if v == nil or v == E.NULL then return nil end
+        local nk = E.SQL.NormKey(v)
+        parts[i] = (type(nk) == "number" and "n" or "s") .. tostring(nk)
+    end
+    return table.concat(parts, "\31")
+end
+
+local function keyText(def, row)
+    local parts = {}
+    for i, k in ipairs(def.primaryKey) do parts[i] = tostring(E.SQL.ToText(row[k])) end
+    return table.concat(parts, ", ")
+end
+
+-- PRIMARY KEY checks for new rows (before anything is changed)
+local function checkNewKeys(def, newRows)
+    local pk = def.primaryKey
+    if not pk then return end
+    local seen = {}
+    for _, r in ipairs(def.rows) do
+        local k = E.RowKey(r, pk)
+        if k then seen[k] = true end
+    end
+    for _, r in ipairs(newRows) do
+        local k = E.RowKey(r, pk)
+        if not k then E.SQL.Fail("the PRIMARY KEY of %s (%s) can't be NULL", def.name, table.concat(pk, ", ")) end
+        if seen[k] then E.SQL.Fail("duplicate PRIMARY KEY (%s) in %s; use UPSERT or ON CONFLICT to update it", keyText(def, r), def.name) end
+        seen[k] = true
+    end
+end
+
+-- PRIMARY KEY checks for updates (before anything is changed)
+local function checkUpdatedKeys(def, updates)
+    local pk = def.primaryKey
+    if not pk then return end
+    local isPk, touches = {}, false
+    for _, k in ipairs(pk) do isPk[k] = true end
+    for _, u in ipairs(updates) do
+        for k in pairs(u.changes) do if isPk[k] then touches = true end end
+    end
+    if not touches then return end
+    local newKey = {}
+    for _, u in ipairs(updates) do
+        local probe = {}
+        for _, k in ipairs(pk) do
+            local v = u.changes[k]
+            if v == nil then v = u.row[k] elseif v == E.NULL then v = nil else v = coerce(v, def.colIndex[k].type) end
+            probe[k] = v
+        end
+        local key = E.RowKey(probe, pk)
+        if not key then E.SQL.Fail("the PRIMARY KEY of %s (%s) can't be NULL", def.name, table.concat(pk, ", ")) end
+        newKey[u.row] = { key = key, probe = probe }
+    end
+    local seen = {}
+    for _, r in ipairs(def.rows) do
+        local nk = newKey[r]
+        local key = nk and nk.key or E.RowKey(r, pk)
+        if key then
+            if seen[key] then
+                E.SQL.Fail("duplicate PRIMARY KEY (%s) in %s", keyText(def, nk and nk.probe or r), def.name)
+            end
+            seen[key] = true
+        end
+    end
+end
+
 -- Insert row objects (keyed by lower-case column name) into a user table,
 -- or into an add-on table that defines def.insert(row). Returns the count.
 function E.InsertRows(def, objs)
@@ -424,11 +540,10 @@ function E.InsertRows(def, objs)
         if #def.rows + #objs > E.USER_TABLE_MAX_ROWS then
             E.SQL.Fail("table %s would have %d rows; the limit is %d", def.name, #def.rows + #objs, E.USER_TABLE_MAX_ROWS)
         end
-        for _, obj in ipairs(objs) do
-            local row = {}
-            for _, c in ipairs(def.columns) do row[c.key] = coerce(obj[c.key], c.type) end
-            def.rows[#def.rows + 1] = row
-        end
+        local newRows = {}
+        for i, obj in ipairs(objs) do newRows[i] = E.CoerceRow(def, obj) end
+        checkNewKeys(def, newRows)
+        for _, row in ipairs(newRows) do def.rows[#def.rows + 1] = row end
         def.index = nil
         saveUserTable(def)
     else
@@ -443,6 +558,7 @@ end
 -- A change to nil is stored as NULL. Returns the number of rows changed.
 function E.UpdateRows(def, updates)
     if E.CheckWritable(def, "UPDATE") == "user" then
+        checkUpdatedKeys(def, updates)
         for _, u in ipairs(updates) do
             for key, v in pairs(u.changes) do
                 local col = def.colIndex[key]
@@ -490,6 +606,106 @@ function E.DeleteRows(def, doomed)
     return #doomed
 end
 
+--[[
+    Insert rows, or change the ones that are already there (upsert).
+    opts:
+      keyCols   columns that identify a row (default: the table's PRIMARY KEY)
+      mode      "merge"    update the columns each new row gives (UPSERT)
+                "replace"  overwrite the whole row; missing columns become NULL (REPLACE)
+                "nothing"  keep the existing row (INSERT OR IGNORE / DO NOTHING)
+                "custom"   opts.merge(current, excluded) returns { col = value } or nil
+    Rows are matched like "=": text without case. A row with a NULL in a key
+    column never matches. Rows earlier in the same call count too, so two new
+    rows with one key give one insert and one update.
+    Returns { inserted = n, updated = n, unchanged = n }.
+]]
+function E.UpsertRows(def, objs, opts)
+    opts = opts or {}
+    local mode = opts.mode or "merge"
+    E.CheckWritable(def, "INSERT")
+    if mode ~= "nothing" then E.CheckWritable(def, "UPDATE") end
+    local keyCols = opts.keyCols or def.primaryKey
+    if not keyCols or #keyCols == 0 then
+        E.SQL.Fail("%s has no PRIMARY KEY; name the columns that identify a row: ON CONFLICT (col, ...)", def.name)
+    end
+    local isKeyCol = {}
+    for _, k in ipairs(keyCols) do
+        if not def.colIndex[k] then E.SQL.Fail("table %s has no column '%s'", def.name, k) end
+        isKeyCol[k] = true
+    end
+
+    local index = {}
+    local existing = def.kind == "user" and def.rows or E.GetRows(def)
+    for _, r in ipairs(existing) do
+        E.Tick()
+        local k = E.RowKey(r, keyCols)
+        if k and not index[k] then index[k] = { row = r } end
+    end
+
+    local inserts, touched = {}, {}
+    local stats = { inserted = 0, updated = 0, unchanged = 0 }
+    for _, obj in ipairs(objs) do
+        E.Tick()
+        local excluded = E.CoerceRow(def, obj)
+        local k = E.RowKey(excluded, keyCols)
+        local hit = k and index[k]
+        if not hit then
+            inserts[#inserts + 1] = obj
+            stats.inserted = stats.inserted + 1
+            if k then index[k] = { pending = obj } end
+        else
+            -- the row as it is now, including earlier changes in this call
+            if not hit.view then
+                hit.view = hit.pending and E.CoerceRow(def, hit.pending) or E.ShallowCopy(hit.row)
+            end
+            local changes
+            if mode == "replace" then
+                changes = {}
+                for _, c in ipairs(def.columns) do
+                    local v = excluded[c.key]
+                    changes[c.key] = v == nil and E.NULL or v
+                end
+            elseif mode == "merge" then
+                -- the columns the new row gives, except the key: it identifies
+                -- the row and keeps its spelling ('HEAD' matched 'head')
+                changes = {}
+                for key, v in pairs(obj) do
+                    if def.colIndex[key] and not isKeyCol[key] then changes[key] = (v == nil) and E.NULL or v end
+                end
+            elseif mode == "custom" then
+                changes = opts.merge(hit.view, excluded)
+            end
+            if changes and next(changes) then
+                for key, v in pairs(changes) do
+                    local col = def.colIndex[key]
+                    local val = v ~= E.NULL and E.CoerceValue(v, col and col.type) or nil
+                    hit.view[key] = val
+                    if hit.pending then
+                        hit.pending[key] = val
+                    else
+                        hit.changes = hit.changes or {}
+                        hit.changes[key] = v
+                    end
+                end
+                if not hit.pending and not hit.listed then
+                    hit.listed = true
+                    touched[#touched + 1] = hit
+                end
+                stats.updated = stats.updated + 1
+            else
+                stats.unchanged = stats.unchanged + 1
+            end
+        end
+    end
+
+    local updates = {}
+    for i, hit in ipairs(touched) do updates[i] = { row = hit.row, changes = hit.changes } end
+    if #inserts > 0 then E.InsertRows(def, inserts) end
+    if #updates > 0 then E.UpdateRows(def, updates) end
+    E.FireCallbacks("RowsUpserted", def.name, stats.inserted, stats.updated)
+    return stats
+end
+
 function E.DropUserTable(name)
     local def = E.tables[name]
     if not def then return false, format("no table '%s'", name) end
@@ -513,6 +729,12 @@ function E.LoadUserTables()
             for i, n in ipairs(saved.columns or {}) do cols[i] = { name = n, type = types[i] or "any", desc = "" } end
             local def = { name = name, kind = "user", columns = cols, desc = saved.desc or "your table" }
             E.RegisterTable(def)
+            if type(saved.primaryKey) == "table" and #saved.primaryKey > 0 then
+                def.primaryKey = saved.primaryKey
+                for _, k in ipairs(def.primaryKey) do
+                    if def.colIndex[k] then def.colIndex[k].desc = "primary key" end
+                end
+            end
             local rows = {}
             for r, arr in ipairs(saved.rows or {}) do
                 local row = {}

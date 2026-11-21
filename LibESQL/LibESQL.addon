@@ -15,4 +15,6 @@ LibESQL_Tables_Items.lua
 LibESQL_Tables_Character.lua
 LibESQL_Tables_World.lua
 LibESQL_Tables_Meta.lua
+LibESQL_SavedVars.lua
+LibESQL_Export.lua
 LibESQL_API.lua

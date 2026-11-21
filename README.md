@@ -6,13 +6,13 @@ An Elder Scrolls Online library that lets add-ons query game data with SQL. It w
 local res = LibESQL.Query("SELECT id, name, duration_ms FROM abilities WHERE id = ?", { params = { 46340 } })
 ```
 
-It has about 48 tables: every ability id, skills and morphs, champion stars, scribing, live buffs and debuffs, every set with its bonuses and pieces, every item id, your inventory, achievements, collectibles, quests, zones, POIs, wayshrines, dungeons, the game's constants, strings and functions, and more. `SHOW TABLES` and `DESCRIBE <table>` list them all.
+It has 52 built-in tables: every ability id, skills and morphs, champion stars, scribing, live buffs and debuffs, every set with its bonuses and pieces, every item id, your inventory, achievements, collectibles, quests, zones, POIs, wayshrines, dungeons, the game's constants, strings and functions, and more. Other add-ons' SavedVariables become tables too. `SHOW TABLES` and `DESCRIBE <table>` list them all.
 
 The **ESQL** add-on is the window and console panel built on this library. You don't need it to use LibESQL.
 
 ## Documentation
 
-[API Reference](API%20Reference.md) covers every function with its arguments, returns, and `nil`/`false` cases. It also covers the data structures, the full SQL dialect, every scalar function, performance notes, and all 49 tables with every column.
+[API Reference](API%20Reference.md) (also as a searchable page: [API Reference.html](API%20Reference.html), generated with `python tools/make_api_html.py`) covers every function with its arguments, returns, and `nil`/`false` cases. It also covers the data structures, the full SQL dialect, every scalar function, performance notes, and all 52 built-in tables with every column.
 
 ## Examples
 
@@ -67,9 +67,16 @@ end)
 | `LibESQL.Scalar(sql, params?)` | The first column of the first row, or `nil` (`nil, errorText` on error). |
 | `LibESQL.ToObjects(result)` | The rows of a result as objects. |
 | `LibESQL.Quote(value)` | The value as an SQL literal: `Kinras's` becomes `'Kinras''s'`, `nil` becomes `NULL`. |
+| `LibESQL.Highlight(sql, colors?)` | The SQL with `\|c` colour markup for a label: keywords, functions, table names, strings, numbers, `?` and comments. It never fails on half-typed SQL. `colors` overrides the palette, for example `{ keyword = "FF8800", identifier = false }`. |
+| `LibESQL.ToMySQL(result, tableName, opts?)` | A phpMyAdmin-style MySQL dump (`CREATE TABLE` + `INSERT`) of a query result. It also returns the dump as whole-statement blocks, for splitting into pages. |
+| `LibESQL.RescanSavedVariables(callback?)` | Finds other add-ons' SavedVariables again and rebuilds their tables, in the background. Calls `callback(count)` when done. |
+| `LibESQL.AddSavedVariable(name)` / `RemoveSavedVariable(name)` | Includes or leaves out a plain SavedVariables table that doesn't use `ZO_SavedVars`. This is remembered. |
+| `LibESQL.GetSavedVariables()` | What the last scan found: `{ { name, addon, style, tables = { ... } }, ... }` |
+| `LibESQL.Escape(text, char?)` | Escapes `%`, `_` and the escape character (default `\`) for `LIKE ? ESCAPE '\'`, so text a player typed matches itself. |
 | `LibESQL.Validate(sql)` | `true`, or `false, errorText`. Parses the SQL without running it. |
 | `LibESQL.CreateTable(name, columns, ifNotExists?)` | Creates a table you can insert into: `{ "boss TEXT", "secs REAL" }`. Returns `true`, `false` if it already existed (with `ifNotExists`), or `nil, errorText`. |
 | `LibESQL.Insert(table, row or rows)` | Inserts `{ boss = "Zaan", secs = 61 }` or an array of such rows. Returns the count or `nil, errorText`. |
+| `LibESQL.Upsert(table, row or rows, keyColumns?)` | Inserts each row, or updates the row with the same key (default: the table's `PRIMARY KEY`). Only the columns each row gives change. Returns `inserted + updated, { inserted, updated, unchanged }` or `nil, errorText`. |
 | `LibESQL.Update(table, changes, where?, whereParams?)` | Updates rows: `Update("kills", { secs = 50 }, "boss = ?", { "Zaan" })`. Leave out `where` to update every row, and use `LibESQL.NULL` to set a column to NULL. Returns the number of rows changed or `nil, errorText`. |
 | `LibESQL.Delete(table, where?, whereParams?)` | Deletes rows: `Delete("kills", "boss = ?", { "Zaan" })`. Leave out `where` to delete every row (the table stays). Returns the number of rows removed or `nil, errorText`. |
 | `LibESQL.DropTable(name)` | Drops one of your tables. Returns `true` or `nil, errorText`. |
@@ -108,9 +115,11 @@ A lookup by primary key, such as `WHERE id = 123` or `WHERE id IN (1, 2, 3)`, ne
 | `ScanDone` | `tableName, count` |
 | `UserTableCreated` | `name` |
 | `UserTableDropped` | `name` |
+| `SavedVariablesScanned` | `count` |
 | `RowsInserted` | `tableName, count` |
 | `RowsUpdated` | `tableName, count` |
 | `RowsDeleted` | `tableName, count` |
+| `RowsUpserted` | `tableName, inserted, updated` |
 
 ## Your own tables
 
@@ -152,6 +161,12 @@ LibESQL.Insert("kills", { boss = "Nirn", secs = 48, at = GetTimeStamp() })   -- 
 LibESQL.Query("UPDATE kills SET secs = ? WHERE boss = ? AND secs > ?", { params = { 55, "Zaan", 55 } })
 LibESQL.Update("kills", { secs = 55 }, "boss = ?", { "Zaan" })                -- same thing from Lua
 
+-- upsert: keep one row per boss, with the best time and the number of tries
+LibESQL.Query("CREATE TABLE IF NOT EXISTS best (boss TEXT PRIMARY KEY, secs REAL, tries INT)")
+LibESQL.Query([[INSERT INTO best VALUES (?, ?, 1)
+    ON CONFLICT DO UPDATE SET secs = MIN(secs, excluded.secs), tries = tries + 1]], { params = { "Zaan", 58 } })
+LibESQL.Upsert("best", { boss = "Nirn", secs = 47 })                         -- insert, or update secs
+
 LibESQL.Query("DELETE FROM kills WHERE at < ?", { params = { GetTimeStamp() - 7 * 86400 } })
 LibESQL.Delete("kills", "at < ?", { GetTimeStamp() - 7 * 86400 })            -- same thing from Lua
 
@@ -162,9 +177,27 @@ end
 
 - Inserted values are converted to the column's type: `'42'` into an `INT` becomes `42`, and `'yes'` into a `BOOL` becomes `true`.
 - Columns you leave out are `NULL`.
+- **Primary keys:** `PRIMARY KEY` on a column (or `PRIMARY KEY (a, b)` for a composite key) makes `INSERT` and `UPDATE` refuse duplicates and `NULL`s. Keys match like `=`, so text is compared without case.
+- **Upsert:** inserts new rows and updates existing ones. `UPSERT` changes only the columns you give, and the key keeps its spelling. `REPLACE` overwrites the whole row. `DO NOTHING` / `INSERT OR IGNORE` keeps the existing row. In `DO UPDATE SET`, a plain column is the row already in the table and `excluded.col` is the row you tried to insert. A table without a primary key can upsert too: name the matching columns in `ON CONFLICT (a, b)`.
 - `UPDATE` and `DELETE` without `WHERE` affect every row. `DELETE FROM t` empties the table but keeps it; `DROP TABLE t` removes it.
 - In `UPDATE`, the `SET` expressions can use the row's current values (`SET secs = secs - 1`), and each one is computed from the row as it was before the update.
 - Tables you register with `RegisterTable` can accept writes too: give the definition an `insert = function(row) ... end`, an `update = function(row, changes) ... end` and/or a `delete = function(row) ... end`.
+
+## Other add-ons' saved data
+
+LibESQL turns other add-ons' SavedVariables into tables, on PC and on console. SavedVariables are ordinary Lua tables once the game has loaded them, so this works even where the game never writes them to a file you can reach, such as console and the `pccert` client.
+
+```sql
+SELECT name, addon, characters, tables FROM saved_variables         -- what was found
+SELECT table_name, records, pattern FROM sv_tables                  -- the tables made from it
+SELECT * FROM sv_consolemetrics_savedfights                         -- one of them
+SELECT path, value FROM sv_values WHERE sv = 'ConsoleMetricsSavedVars'
+```
+
+- **Found automatically:** every add-on that uses `ZO_SavedVars` (`Default` > `@account` > `$AccountWide` / character id). The scan runs once the world has loaded, and `SCAN savedvariables` runs it again. To include a plain table that doesn't use `ZO_SavedVars`, call `LibESQL.AddSavedVariable("GlobalName")`. The game's own `ZO_*` saved variables are left out unless `LibESQL.SV_INCLUDE_GAME = true`.
+- **Lists become tables:** any list of records inside, such as saved fights, a map of items, or a nested list like each fight's abilities, becomes a table named `sv_<saved variable>_<path>`. It has one column per field, plus `account`, `scope` (character name or `account-wide`), `character_id`, `key` and `path`.
+- **`sv_values`:** has every single value as `path` / `value` rows, for data that isn't a list.
+- **Read-only and live:** the data is never changed, and every query reads the add-on's current data. Lists are copied before they're walked, so an add-on changing its data mid-query is safe. Size caps (`SV_MAX_NODES`, `SV_MAX_VALUES`) keep huge saved variables from hitching the game.
 
 ## Your own SQL functions
 
@@ -181,16 +214,19 @@ LibESQL.Query("SELECT name, SECONDS(duration_ms) FROM abilities WHERE id = 46340
 - `WHERE`, `GROUP BY` (by expression, alias or number), `HAVING`, `ORDER BY ... [ASC|DESC]`, `LIMIT n [OFFSET m]`, `LIMIT m, n`
 - Operators: `= == != <> < <= > >=`, `AND OR NOT`, `+ - * / %`, `||`, `LIKE`, `IN`, `BETWEEN`, `IS [NOT] NULL`, `CASE`, `CAST(x AS INT|REAL|TEXT|BOOL)`, and `?` parameters
 - Aggregates: `COUNT(*)`, `COUNT(DISTINCT x)`, `SUM`, `AVG`, `MIN`, `MAX`, `TOTAL`, `GROUP_CONCAT(x, sep)`
-- Text functions: `LOWER UPPER LENGTH SUBSTR LEFT RIGHT TRIM REPLACE INSTR CONTAINS STARTSWITH CONCAT CONCAT_WS PRINTF`
+- Text functions: `LOWER UPPER LENGTH SUBSTR LEFT RIGHT TRIM REPLACE INSTR CONTAINS STARTSWITH CONCAT CONCAT_WS PRINTF ESCAPE QUOTE`
+- `LIKE ... ESCAPE 'c'`: `LIKE '%100!%%' ESCAPE '!'` matches a real `%`
 - Pattern functions: `MATCH(s, luaPattern)` and `CAPTURE(s, luaPattern)`
 - Math functions: `ABS ROUND FLOOR CEIL SQRT POWER MOD SIGN RANDOM`
+- Date and time: `NOW()` / `CURRENT_TIMESTAMP` (`'2026-11-20 14:05:33'`), `CURRENT_DATE`, `CURRENT_TIME`, `UNIX_TIMESTAMP([text])`, `FROM_UNIXTIME(ts [, fmt])`, `DATE(...)`. These work on console too.
 - NULL and logic functions: `COALESCE IFNULL NULLIF IIF TYPEOF`, plus `MIN`/`MAX` with two or more arguments
 - ESO functions:
   - Names and details: `ABILITY_NAME ABILITY_DESC ABILITY_ICON ABILITY_DURATION ABILITY_LINK SET_NAME ZONE_NAME ITEM_NAME ITEM_LINK ITEM_ID COLLECTIBLE_NAME ACHIEVEMENT_NAME`
   - Text and display: `CLEAN` strips markup, `ICON(path, size)` makes texture markup, `STR(SI_x)` returns a localized string
   - Constants: `ENUM(prefix, value)` gives the name of an enum value, and `CONST(name)` gives the value of a constant
 - Writing to your own tables: `CREATE TABLE [IF NOT EXISTS] t (col INT|REAL|TEXT|BOOL, ...)`, `INSERT INTO t [(cols)] VALUES (...), (...)`, `INSERT INTO t [(cols)] SELECT ...`, `UPDATE t SET col = expr [, ...] [WHERE ...]`, `DELETE FROM t [WHERE ...]`
-- Statements: `SHOW TABLES`, `DESCRIBE t`, `DROP TABLE t` (your tables only), `REFRESH t|ALL`, `SCAN abilities|items`, `HELP`
+- Upsert: `UPSERT INTO t ...`, `INSERT OR REPLACE` / `REPLACE INTO`, `INSERT OR IGNORE`, `INSERT ... ON CONFLICT [(cols)] DO NOTHING | DO UPDATE SET c = excluded.c [WHERE ...]`, `INSERT ... ON DUPLICATE KEY UPDATE c = VALUES(c)`, and `PRIMARY KEY` in `CREATE TABLE`
+- Statements: `SHOW TABLES`, `DESCRIBE t`, `DROP TABLE t` (your tables only), `REFRESH t|ALL`, `SCAN abilities|items|savedvariables`, `HELP`
 
 Text comparison (`=`, `<`, `ORDER BY`) and `LIKE` ignore case. Your own tables (`CREATE TABLE`, `INSERT`, `UPDATE`, `DELETE`, `SELECT ... INTO`) are saved in `LibESQL_SV` and are there again after a reload.
 
@@ -210,6 +246,7 @@ Run `SHOW TABLES` and `DESCRIBE <name>` for the complete list with column descri
 | Social | `guilds`, `guild_members`, `friends`, `group_members` |
 | World | `zones`, `pois`, `wayshrines`, `activities`, `classes`, `races`, `maps` |
 | Game API | `constants`, `events`, `strings`, `functions`, `sounds` |
+| Other add-ons' saved data | `saved_variables`, `sv_tables`, `sv_values`, and generated `sv_*` tables |
 | Meta | `tables`, `columns` |
 
 Table kinds:

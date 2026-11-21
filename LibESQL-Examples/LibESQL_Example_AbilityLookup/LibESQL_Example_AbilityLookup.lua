@@ -27,11 +27,12 @@ SLASH_COMMANDS["/abil"] = function(arg)
 
     if not LibESQL.IsScanned("abilities") then Print("Building the ability index once, this takes a few seconds...") end
     -- QueryAsync spreads the work over frames, so the game doesn't freeze
-    LibESQL.QueryAsync("SELECT id, name FROM abilities WHERE name LIKE ? ORDER BY name, id LIMIT 20",
+    -- LibESQL.Escape: a % or _ in what the player typed matches itself, not "anything"
+    LibESQL.QueryAsync("SELECT id, name FROM abilities WHERE name LIKE ? ESCAPE '\\' ORDER BY name, id LIMIT 20",
         function(res, err)
             if not res then Print("Error: %s", err) return end
             Print("%d match(es) for '%s':", #res.rows, arg)
             for _, r in ipairs(res.rows) do Print("  %d  %s", r[1], r[2]) end
         end,
-        { params = { "%" .. arg .. "%" } })
+        { params = { "%" .. LibESQL.Escape(arg) .. "%" } })
 end

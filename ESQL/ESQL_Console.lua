@@ -26,10 +26,10 @@ end
 -- Create a table prompt
 ---------------------------------------------------------------------------
 C.TEMPLATES = {
-    { name = "Notes", table = "notes", cols = "id INT, note TEXT, done BOOL" },
+    { name = "Notes", table = "notes", cols = "id INT PRIMARY KEY, note TEXT, done BOOL" },
     { name = "Wishlist (set pieces)", table = "wishlist", cols = "set_name TEXT, piece TEXT, got BOOL" },
     { name = "Boss times", table = "boss_times", cols = "boss TEXT, secs REAL, at INT" },
-    { name = "Shopping list", table = "shopping", cols = "item TEXT, count INT, bought BOOL" },
+    { name = "Shopping list", table = "shopping", cols = "item TEXT PRIMARY KEY, count INT, bought BOOL" },
     { name = "Blank", table = "", cols = "" },
 }
 
@@ -69,7 +69,16 @@ function C.ParseColumns(text)
         if not name or not name:find("^[%a_][%w_]*$") then
             return nil, format("'%s' is not a valid column name (letters, digits and _; not starting with a digit)", part)
         end
-        if extra ~= "" then return nil, format("'%s': write one name and one type per column", part) end
+        -- "name TYPE PRIMARY KEY" or "name PRIMARY KEY": the key used by UPSERT
+        local primary = false
+        local rest = ((ty ~= "" and (ty .. " ") or "") .. extra):lower():gsub("%s+", " "):gsub("%s$", "")
+        if rest:find("primary key$") then
+            primary = true
+            rest = rest:gsub("%s*primary key$", "")
+            ty = rest
+            extra = ""
+        end
+        if extra ~= "" or ty:find(" ") then return nil, format("'%s': write one name and one type per column (and PRIMARY KEY if it's the key)", part) end
         if seen[name] then return nil, format("column '%s' is listed twice", name) end
         seen[name] = true
         local t = nil
@@ -77,7 +86,7 @@ function C.ParseColumns(text)
             t = TYPES[ty:lower()]
             if not t then return nil, format("unknown type '%s' for %s (use INT, REAL, TEXT or BOOL)", ty, name) end
         end
-        cols[#cols + 1] = { name = name, type = t }
+        cols[#cols + 1] = { name = name, type = t, primary = primary }
         if #cols > MAX_COLUMNS then return nil, format("at most %d columns", MAX_COLUMNS) end
     end
     return cols
@@ -96,7 +105,9 @@ function C.BuildCreateSQL(tableName, columnsText)
     local cols, err = C.ParseColumns(columnsText)
     if not cols then return nil, err end
     local parts = {}
-    for i, c in ipairs(cols) do parts[i] = c.type and (c.name .. " " .. c.type) or c.name end
+    for i, c in ipairs(cols) do
+        parts[i] = (c.type and (c.name .. " " .. c.type) or c.name) .. (c.primary and " PRIMARY KEY" or "")
+    end
     local sql = format("CREATE TABLE %s (%s)", name, table.concat(parts, ", "))
     local ok, perr = E.Validate(sql)
     if not ok then return nil, perr end
@@ -123,6 +134,7 @@ function C.CreatePreview()
     end
     local sql, err = C.BuildCreateSQL(C.newName, C.newCols)
     if not sql then return "|cFF6666" .. err .. "|r" end
+    if UI.HighlightEnabled() then sql = E.Highlight(sql) end
     return "|c7FD67FWill run:|r " .. sql
 end
 
@@ -390,6 +402,12 @@ function C.Init()
 
     add({ type = LHAS.ST_SECTION, label = "Results" })
     add({
+        type = LHAS.ST_CHECKBOX, label = "Syntax highlighting",
+        tooltip = "Colours keywords, functions, table names, text and numbers in the query box and previews.",
+        getFunction = function() return UI.HighlightEnabled() end,
+        setFunction = function(v) UI.SetHighlight(v); C.Refresh() end,
+    })
+    add({
         type = LHAS.ST_SLIDER, label = "Text size", min = 6, max = 25, step = 1,
         tooltip = "Size of the text in the results window (10 = normal).",
         getFunction = function() return math.floor((E.sv.uiScale or 1) * 10 + 0.5) end,
@@ -409,9 +427,16 @@ function C.Init()
         end,
     })
     add({
+        type = LHAS.ST_EDIT, label = "Export name",
+        tooltip = "Name for the saved export (letters, digits and _). Each name is kept separately.",
+        getFunction = function() return C.exportName or "export" end,
+        setFunction = function(v) C.exportName = v end,
+        maxChars = 40, textType = TEXT_TYPE_ALL,
+    })
+    add({
         type = LHAS.ST_BUTTON, label = "Save last result to SavedVariables", buttonText = "Export",
-        tooltip = "Written to SavedVariables/ESQL.lua (ESQL_SV ... export) on logout or /reloadui.",
-        clickHandler = function() E.ExportLast() end,
+        tooltip = "Written to SavedVariables/ESQL.lua on logout or /reloadui. On PC, ESQL/tools/esql_to_mysql.py turns your exports and tables into a .sql file for phpMyAdmin.",
+        clickHandler = function() E.ExportLast(C.exportName) end,
     })
 
     add({ type = LHAS.ST_SECTION, label = "Data collection" })
@@ -432,6 +457,11 @@ function C.Init()
         type = LHAS.ST_BUTTON, label = "Re-index ability ids", buttonText = "Scan",
         tooltip = "Rebuilds the list of every ability id. Runs in the background.",
         clickHandler = function() C.query = "SCAN abilities"; run() end,
+    })
+    add({
+        type = LHAS.ST_BUTTON, label = "Rescan other add-ons' saved data", buttonText = "Scan",
+        tooltip = "Finds other add-ons' SavedVariables again and turns their lists into tables (see sv_tables).",
+        clickHandler = function() C.query = "SCAN savedvariables"; run() end,
     })
     add({
         type = LHAS.ST_BUTTON, label = "Index item ids", buttonText = "Scan",

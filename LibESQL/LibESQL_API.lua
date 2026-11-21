@@ -60,6 +60,19 @@ function E.Scalar(text, params)
     return row and row[1]
 end
 
+-- SQL text with |c colour markup for an ESO label (keywords, functions,
+-- tables, strings, numbers, ?, comments). colors: optional overrides of
+-- LibESQL.SQL.HIGHLIGHT_COLORS ({ keyword = "RRGGBB", ... }).
+function E.Highlight(text, colors)
+    if colors then
+        local merged = {}
+        for k, v in pairs(SQL.HIGHLIGHT_COLORS) do merged[k] = v end
+        for k, v in pairs(colors) do merged[k] = v end
+        colors = merged
+    end
+    return SQL.Highlight(text, colors)
+end
+
 -- Quote a value as an SQL literal: Quote("Kinras's") -> 'Kinras''s'
 function E.Quote(v)
     if v == nil then return "NULL" end
@@ -67,6 +80,17 @@ function E.Quote(v)
     if v == false then return "FALSE" end
     if type(v) == "number" then return SQL.ToText(v) end
     return "'" .. tostring(v):gsub("'", "''") .. "'"
+end
+
+-- Escape LIKE wildcards so text matches itself: % _ and the escape character
+-- get the escape character (default "\") in front. Use it with ESCAPE '\':
+--   Select("... WHERE name LIKE ? ESCAPE '\\'", { "%" .. LibESQL.Escape(text) .. "%" })
+-- Returns the text, nil for nil, or nil + error text for a bad escape character.
+function E.Escape(text, escapeChar)
+    if text == nil then return nil end
+    local ok, res = pcall(SQL.FUNCS.ESCAPE, text, escapeChar)
+    if not ok then return nil, SQL.ErrorText(res) end
+    return res
 end
 
 -- Parse only; returns true or false + error text (for validating user input).
@@ -88,9 +112,11 @@ function E.CreateTable(name, columns, ifNotExists)
     for i, c in ipairs(columns or {}) do
         if type(c) == "string" then
             local n, t = c:match("^%s*([%w_]+)%s*([%w_]*)")
-            cols[i] = { name = n, type = t ~= "" and t:lower() or nil }
+            local primary = c:lower():find("primary%s+key") ~= nil
+            if t and t:lower() == "primary" then t = "" end
+            cols[i] = { name = n, type = t ~= "" and t:lower() or nil, primary = primary }
         else
-            cols[i] = { name = c.name or c[1], type = c.type or c[2] }
+            cols[i] = { name = c.name or c[1], type = c.type or c[2], primary = c.primaryKey or c.primary }
         end
         if not cols[i].name then return nil, "bad column definition #" .. i end
     end
@@ -167,6 +193,38 @@ function E.Delete(tableName, where, whereParams)
     local res, err = E.Query(sql, whereParams and { params = whereParams } or nil)
     if not res then return nil, err end
     return res.rowsAffected
+end
+
+-- Insert rows, or update the ones that already exist (matched on keyColumns,
+-- default: the table's PRIMARY KEY). Only the columns each row gives are
+-- changed. Returns inserted + updated, { inserted, updated, unchanged }
+-- or nil + error text.
+function E.Upsert(tableName, rowOrRows, keyColumns)
+    local def = E.GetTable(tableName or "")
+    if not def then return nil, "no table '" .. tostring(tableName) .. "'" end
+    local list = rowOrRows
+    if type(list) ~= "table" then return nil, "Upsert needs a row table or an array of rows" end
+    if list[1] == nil or type(list[1]) ~= "table" then list = { list } end
+    local objs = {}
+    for i, row in ipairs(list) do
+        local obj = {}
+        for k, v in pairs(row) do
+            local key = type(k) == "string" and k:lower() or k
+            if not def.colIndex[key] then
+                return nil, string.format("row %d: table %s has no column '%s'", i, def.name, tostring(k))
+            end
+            obj[key] = v
+        end
+        objs[i] = obj
+    end
+    local keyCols
+    if keyColumns then
+        keyCols = {}
+        for i, k in ipairs(type(keyColumns) == "table" and keyColumns or { keyColumns }) do keyCols[i] = tostring(k):lower() end
+    end
+    local ok, res = pcall(E.UpsertRows, def, objs, { mode = "merge", keyCols = keyCols })
+    if not ok then return nil, SQL.ErrorText(res) end
+    return res.inserted + res.updated, res
 end
 
 -- Drop one of your tables. Returns true, or nil + error text.

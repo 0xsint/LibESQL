@@ -10,14 +10,16 @@ Every table that comes with LibESQL is **built in and always read-only**. That c
 
 - [Conventions](#conventions)
 - [Data structures](#data-structures): [result](#result), [opts](#opts), [errors](#errors), [job](#job), [table definition](#table-definition), [column definition](#column-definition)
-- [Querying](#querying): Query, QueryAsync, Select, Scalar, ToObjects, Quote, Validate
-- [Writing to your own tables](#writing-to-your-own-tables): CreateTable, Insert, Update, Delete, DropTable
+- [Querying](#querying): Query, QueryAsync, Select, Scalar, ToObjects, Quote, Highlight, Validate
+- [Writing to your own tables](#writing-to-your-own-tables): CreateTable, Insert, Upsert, Update, Delete, DropTable
 - [Schema](#schema): GetTableNames, GetColumns, GetTable, RegisterTable, Refresh
 - [Id scans](#id-scans): Scan, IsScanned
 - [SQL functions](#sql-functions-from-lua): RegisterFunction
 - [Data collection](#data-collection): effect tracking, combat log
 - [Callbacks](#callbacks)
 - [Background jobs](#background-jobs): RunAsync, RunSync, Tick, CancelJob, CancelJobs, HasJobs
+- [MySQL export](#mysql-export): ToMySQL, MySQLValue, MySQLColumnType, MySQLTableName
+- [Other add-ons' saved data](#other-add-ons-saved-data): saved_variables, sv_tables, sv_values, generated sv_* tables
 - [Utilities](#utilities)
 - [Low-level: LibESQL.SQL](#low-level-libesqlsql)
 - [Fields and limits](#fields-and-limits)
@@ -54,6 +56,7 @@ What every query returns.
     elapsedMs = 3,                            -- time to run (in-game clock)
     message   = nil,                          -- text for INTO / INSERT / UPDATE / DELETE / CREATE / DROP / REFRESH / SCAN statements
     rowsAffected = nil,                       -- INSERT / UPDATE / DELETE only: rows inserted, changed or removed
+    inserted, updated, unchanged = nil,       -- upserts only: what happened to each row
 }
 ```
 
@@ -184,6 +187,47 @@ Formats a value as an SQL literal.
   - `nil` gives `NULL`
 - **Tip:** prefer `?` parameters. `Quote` is for building SQL text that you show to people.
 
+### LibESQL.Highlight(sql, colors)
+
+Colours SQL for display in a label, the way the ESQL window shows its query box.
+
+- **Arguments:**
+  - `sql`: string. `nil` counts as `""`.
+  - `colors`: optional overrides of `LibESQL.SQL.HIGHLIGHT_COLORS`, as `{ kind = "RRGGBB" }`. Set a kind to `false` to leave it uncoloured.
+- **Returns:** the text with `|cRRGGBB ... |r` markup around each coloured token. Every literal `|` is doubled so ESO displays it, and the rest of the text is unchanged. With the markup removed (and `||` turned back into `|`), you get exactly the input again.
+- **Never fails:** half-typed SQL, such as an unclosed `'string` or `/* comment`, is coloured up to the end of the text. Nothing is parsed or run.
+
+| Kind | Default | What |
+|---|---|---|
+| `keyword` | `4FC3F7` | SQL keywords and statement words: `SELECT`, `FROM`, `WHERE`, `INSERT`, `UPDATE`, `CREATE`, `SHOW`, ... |
+| `function` | `FFD54F` | A built-in or registered function name followed by `(` |
+| `table` | `80CBC4` | Names of tables that exist right now |
+| `string` | `A5D6A7` | `'text'` |
+| `number` | `FFAB91` | `42`, `3.5`, `1e3`, `0x1F` |
+| `param` | `CE93D8` | `?` |
+| `comment` | `7F8C8D` | `-- ...` and `/* ... */` |
+| `operator` | `B0BEC5` | `= < + ( ) , *` and other symbols |
+| `identifier` | `false` | Column names, aliases and quoted names (left uncoloured) |
+
+```lua
+label:SetText(LibESQL.Highlight("SELECT name FROM abilities WHERE id = ?"))
+label:SetText(LibESQL.Highlight(sql, { keyword = "FF8800", table = false }))
+```
+
+### LibESQL.Escape(text, escapeChar)
+
+Escapes `LIKE` wildcards so `text` matches itself. Every `%`, `_` and escape character gets the escape character in front.
+
+- **Arguments:**
+  - `text`: the text to escape
+  - `escapeChar`: one character, default `\`
+- **Returns:** the escaped text, `nil` for `nil`, or `nil, errorText` when `escapeChar` isn't a single character.
+- **Use it with** the same character in `ESCAPE`.
+
+```lua
+LibESQL.Select("SELECT name FROM abilities WHERE name LIKE ? ESCAPE '\\'", { "%" .. LibESQL.Escape(playerText) .. "%" })
+```
+
 ### LibESQL.Validate(sql)
 
 Parses without running. `?` placeholders count as valid.
@@ -218,6 +262,18 @@ User tables:
   - `BOOL`: numbers and `'true'/'false'/'yes'/'no'/'1'/'0'` become booleans
 - Leave values as they are in columns of type `any`, which is what `SELECT ... INTO` makes.
 
+**Primary keys.** A table made with `CREATE TABLE` can have a `PRIMARY KEY`: on one column (`boss TEXT PRIMARY KEY`), or on several (`PRIMARY KEY (char, slot)`). After that:
+- `INSERT` refuses a row whose key already exists or is `NULL`.
+- `UPDATE` refuses a change that would make two rows share a key.
+- Nothing is changed when a check fails.
+- Keys match like `=`, so `'Zaan'` and `'zaan'` are the same key.
+- The key is saved with the table, and `DESCRIBE` shows it as "primary key".
+
+**Upsert.** Upsert inserts new rows and updates the ones that already exist. Rows are matched on the conflict columns: by default the primary key, or the columns named in `ON CONFLICT (a, b)`, which work on tables without a key.
+- A row with a `NULL` in a conflict column never matches.
+- Rows earlier in the same statement count too: two new rows with one key give one insert and one update.
+- **`LibESQL.CreateTable`** understands `"boss TEXT PRIMARY KEY"` strings and `{ name = , type = , primaryKey = true }`.
+
 ### LibESQL.CreateTable(name, columns, ifNotExists)
 
 - **Arguments:**
@@ -234,6 +290,21 @@ User tables:
   - `row`: one row table, such as `{ boss = "Zaan", secs = 61.5 }`, or an array of them. Keys are column names (case-insensitive), and missing columns are `NULL`.
 - **Returns:** the number of rows inserted, or `nil, errorText`. It is an error when there is no such table, the table is read-only, a key isn't a column, or the row limit would be passed. Nothing is inserted if any row is invalid.
 - **Fires:** `RowsInserted`.
+
+### LibESQL.Upsert(tableName, rows, keyColumns)
+
+- **Arguments:**
+  - `tableName`: string
+  - `rows`: one row table, such as `{ boss = "Zaan", secs = 58 }`, or an array of them. Keys are column names (case-insensitive).
+  - `keyColumns`: optional. A column name, or an array of them, that identifies a row. The default is the table's `PRIMARY KEY`.
+- **What it does:** each row is inserted, or, when a row with the same key exists, that row's other given columns are updated. The key keeps its stored spelling, and columns a row doesn't give are left alone. This is the same as `UPSERT INTO`.
+- **Returns:** `inserted + updated, { inserted, updated, unchanged }`, or `nil, errorText`. It is an error when there is no such table, the table is read-only, a key isn't a column, the table has no `PRIMARY KEY` and you give no `keyColumns`, or the change would break the primary key.
+- **Fires:** `RowsUpserted(tableName, inserted, updated)`, plus `RowsInserted` / `RowsUpdated` for each part.
+
+```lua
+LibESQL.Upsert("best", { boss = "Zaan", secs = 58 })                              -- PRIMARY KEY boss
+LibESQL.Upsert("prices", { item = "Dreugh Wax", guild = "Alpha", price = 8500 }, { "item", "guild" })
+```
 
 ### LibESQL.Update(tableName, changes, where, whereParams)
 
@@ -409,9 +480,11 @@ Caps:
 | `ScanDone` | `tableName, count` | An id scan finished. |
 | `UserTableCreated` | `name` | `CREATE TABLE name` created a table, or `SELECT ... INTO name` created or replaced one. |
 | `UserTableDropped` | `name` | `DROP TABLE name`. |
+| `SavedVariablesScanned` | `count` | Other add-ons' SavedVariables were scanned (see [Other add-ons' saved data](#other-add-ons-saved-data)). |
 | `RowsInserted` | `tableName, count` | `INSERT` or `LibESQL.Insert` added rows. |
 | `RowsUpdated` | `tableName, count` | `UPDATE` or `LibESQL.Update` finished. `count` is the number of rows changed, and can be 0. |
 | `RowsDeleted` | `tableName, count` | `DELETE` or `LibESQL.Delete` finished. `count` is the number of rows removed, and can be 0. |
+| `RowsUpserted` | `tableName, inserted, updated` | An upsert finished (any of the forms above, or `LibESQL.Upsert`). |
 
 `LibESQL.FireCallbacks(event, ...)` fires an event. Add-ons can use it for events of their own.
 
@@ -429,6 +502,108 @@ LibESQL does long work in coroutines driven by `EVENT_MANAGER:RegisterForUpdate`
 | `LibESQL.CancelJob(job)` | boolean | Removes one job. Its callback is not called. Returns `true` if the job was still queued. |
 | `LibESQL.CancelJobs()` | none | Removes every job. |
 | `LibESQL.HasJobs()` | boolean | Whether any job is queued. |
+
+---
+
+## MySQL export
+
+These turn query results into SQL for MySQL / MariaDB, in the layout phpMyAdmin uses for its own dumps. `ESQL/tools/esql_to_mysql.py` follows the same rules, to build a dump from SavedVariables outside the game.
+
+### LibESQL.ToMySQL(result, tableName, opts)
+
+- **Arguments:**
+  - `result`: a [result](#result)
+  - `tableName`: string. It's made safe with `MySQLTableName`.
+  - `opts`: optional; the fields are in the table below
+- **Returns:** `dumpText, blocks`.
+  - `dumpText` is the whole dump.
+  - `blocks` is the same dump as `{ { text, first, last }, ... }`: whole statements in order. `first` and `last` are the result rows inside a block, and they are `nil` for the header and `CREATE TABLE` blocks. Join the texts with blank lines to get `dumpText`.
+- **What it writes:**
+  1. `SET SQL_MODE`, `START TRANSACTION`, `SET time_zone` and `SET NAMES utf8mb4`
+  2. `DROP TABLE IF EXISTS`
+  3. `CREATE TABLE ... ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
+  4. multi-row `INSERT`s, with the "Dumping data" comment attached to the first one
+  5. `COMMIT`
+- **Ticks:** it calls `LibESQL.Tick()`, so big results spread over frames inside `QueryAsync` / `RunAsync`.
+
+| `opts` field | Default | Meaning |
+|---|---|---|
+| `types` | inferred | `{ "int"\|"num"\|"text"\|"bool"\|"any", ... }` per column, as stored for user tables |
+| `header` | `true` | `false` leaves out the `SET`/`START TRANSACTION` lines and `COMMIT` (to join several tables into one dump) |
+| `dropTable` | `true` | `false` leaves out `DROP TABLE IF EXISTS` |
+| `rowsPerInsert` | 500 | Rows per `INSERT` statement |
+| `maxInsertBytes` | 1000000 | A new `INSERT` starts before one grows past this |
+| `comment` | none | An extra comment line above the table |
+
+Column types:
+- declared `int` becomes `bigint(20)`, `num` becomes `double`, and `bool` becomes `tinyint(1)`
+- inferred: all booleans give `tinyint(1)`; all whole numbers give `int(11)`, or `bigint(20)` past 2147483647; other numbers give `double`
+- anything else is text by its longest value: `varchar(255)` up to 255 bytes, `text` up to 65535, then `mediumtext`
+- every column allows `NULL`
+
+```lua
+local res = LibESQL.Query("SELECT id, name, duration_ms FROM abilities WHERE name LIKE '%whip%'")
+local sql = LibESQL.ToMySQL(res, "whips")
+```
+
+### LibESQL.MySQLValue(value)
+
+- **Returns:** a MySQL literal.
+  - `nil`, NaN and infinity give `NULL`.
+  - booleans give `1` / `0`.
+  - whole numbers are written without a decimal point. This uses `%.0f`, so values past 2^31 stay exact.
+  - strings are quoted, with `\`, `'`, NUL, newline, carriage return and Ctrl-Z escaped.
+
+### LibESQL.MySQLColumnType(values, declared)
+
+- **Returns:** the MySQL column type for an array of a column's non-NULL values, following the rules above.
+
+### LibESQL.MySQLTableName(name)
+
+- **Returns:** a safe MySQL table name.
+  - It is lower-cased, with anything other than letters, digits and `_` turned into `_`.
+  - It is at most 64 characters.
+  - Names starting with a digit get a `t_` prefix, and an empty name becomes `esql_export`.
+
+## Other add-ons' saved data
+
+LibESQL turns other add-ons' SavedVariables into read-only tables (file `LibESQL_SavedVars.lua`). SavedVariables are global Lua tables once the game has loaded them, on PC and on console alike.
+
+**What counts as saved data:**
+- Every global table in the `ZO_SavedVars` shape: `Global[profile]["@account"]["$AccountWide" | characterId] = data`.
+- Tables added with `AddSavedVariable`.
+- `LibESQL_SV` and `ESQL_SV` are skipped (their data is already in your tables). The game's own `ZO_*` saved variables are skipped unless `LibESQL.SV_INCLUDE_GAME = true`.
+
+**When the scan runs:** once on the first `EVENT_PLAYER_ACTIVATED`, again on `SCAN savedvariables` or `RescanSavedVariables()`, and on the first query of `saved_variables`, `sv_tables` or `sv_values` if none has run yet. A rescan removes tables whose data has gone, and keeps the same names for the rest.
+
+**Which nodes become tables:** a node becomes a table when most of its children are tables that look alike, and they hold plain values. "Look alike" means their keys are array-style, or (with 3 or more of them) they share their most common field.
+
+**Generated tables:**
+- **Name:** `sv_<saved variable>_<path>`.
+  - The saved variable's name is lower-cased, with suffixes like `SavedVars`, `_SV` or `_Settings` dropped.
+  - Path parts with `*` (any key) are left out.
+  - A name that's already taken gets `_2`, `_3`... added. That includes the built-in names, so `sv_values` and `sv_tables` can never be replaced.
+- **Fixed columns:** `account`, `scope` (character name or `account-wide`), `character_id`, `key` (the record's key in its list) and `path` (where it is, for example `savedFights.3.snapshot.skillList.2`).
+- **Field columns:** after the fixed columns come up to `SV_MAX_COLUMNS` field columns, most common first. Names are made safe: numeric keys become `c1`, `c2`..., and a field that clashes with a fixed column becomes `f_<name>`. Only plain values (text, number, boolean) are copied; nested tables have their own tables.
+- **Kind:** live and read-only (not built in, and not writable). `INSERT`/`UPDATE`/`DELETE`/`DROP` are refused, and the add-on's data is never changed.
+- **Safe to read:** every list is copied before LibESQL works through it, so an add-on changing its data while a query runs is safe.
+
+| Function | Returns | Meaning |
+|---|---|---|
+| `LibESQL.RescanSavedVariables(callback)` | job | Rescans in the background. Calls `callback(count)`, or `callback(nil, errorText)` on failure. |
+| `LibESQL.ScanSavedVariables()` | count | The same, run now (inside a query or job it spreads over frames). |
+| `LibESQL.AddSavedVariable(globalName)` | `true` or `nil, errorText` | Includes a plain table that doesn't use `ZO_SavedVars`. It's remembered in `LibESQL_SV.extraSavedVariables`. The next scan picks it up. |
+| `LibESQL.RemoveSavedVariable(globalName)` | `true` | Leaves it out again. |
+| `LibESQL.GetSavedVariables()` | array | `{ { name, addon, style, tables = { { table_name, pattern, records, columns }, ... } }, ... }` |
+| `LibESQL.SV_MAX_NODES` | number | Tables visited per saved variable while looking for lists. PC 250000, console 30000. Past it, `saved_variables.truncated` is true. |
+| `LibESQL.SV_MAX_VALUES` | number | Rows `sv_values` builds per query. PC 200000, console 20000. |
+| `LibESQL.SV_MAX_COLUMNS` | number | Field columns per generated table (60). |
+| `LibESQL.SV_EXCLUDE` | set | Global names never scanned. |
+| `LibESQL.SV_INCLUDE_GAME` | boolean | Also scan the game's own `ZO_*` saved variables (default `false`). |
+
+**Callback:** `SavedVariablesScanned(count)` fires after every scan.
+
+The `addon` column is a guess. It's the longest installed add-on name the saved variable's name starts with, so it can be empty when the names don't match (`HarvestDC_SavedVars` doesn't start with `HarvestMapDC`).
 
 ---
 
@@ -471,6 +646,8 @@ These are for tools and other UIs. Most add-ons don't need them.
 | `SQL.Tokenize(text)` | tokens | The lexer. |
 | `SQL.FUNCS` | table | Scalar functions by upper-case name. `RegisterFunction` writes here. |
 | `SQL.HELP` | array of strings | The text shown by `HELP`. |
+| `SQL.Highlight(text, colors)` | string | The highlighter behind `LibESQL.Highlight`. Here `colors` replaces the whole palette instead of being merged into it. |
+| `SQL.HIGHLIGHT_COLORS` | table | The default palette. Changing it changes the colours for every add-on. |
 
 ---
 
@@ -499,7 +676,7 @@ You can change `budget` at run time. A lower value gives smoother frames and slo
 |---|---|
 | `scans[table]` | `{ api, ranges, count, maxId }`. `ranges` is a compact base-36 string of id runs. |
 | `effectsSeen[abilityId]` | `{ timesSeen, lastSeenTimestamp, flags, maxStacks, effectType, abilityType, statusEffectType }`. The `flags` bits are 1 = on you, 2 = on others, 4 = applied by you. |
-| `userTables[name]` | `{ columns = {...}, types = {...}, rows = { {v1, v2, ...}, ... }, desc }`, from `CREATE TABLE`, `INSERT` and `SELECT ... INTO` |
+| `userTables[name]` | `{ columns = {...}, types = {...}, primaryKey = {...}, rows = { {v1, v2, ...}, ... }, desc }`, from `CREATE TABLE`, `INSERT` and `SELECT ... INTO` |
 | `trackEffects` | boolean |
 
 ---
@@ -517,11 +694,19 @@ You can change `budget` at run time. A lower value gives smoother frames and slo
 | `CREATE TABLE [IF NOT EXISTS] t (col [type], ...)` | Creates an empty user table. The types are `INT`/`INTEGER`/`BIGINT`/`SMALLINT`, `REAL`/`FLOAT`/`DOUBLE`/`NUMBER`/`NUMERIC`/`DECIMAL`, `TEXT`/`STRING`/`VARCHAR`/`CHAR` and `BOOL`/`BOOLEAN`. Sizes such as `VARCHAR(40)` are accepted and ignored. A missing or unknown type means `any`. |
 | `INSERT INTO t [(col, ...)] VALUES (v, ...) [, (v, ...)]` | Adds rows. Values can be any constant expression, `?`, a function, or a `(SELECT ...)`. Without a column list, each row must give every column in order. |
 | `INSERT INTO t [(col, ...)] SELECT ...` | Adds the rows a query returns, matched to the columns by position. |
+| `CREATE TABLE t (a TEXT PRIMARY KEY, ...)` / `CREATE TABLE t (a, b, PRIMARY KEY (a, b))` | A table with a primary key. `NOT NULL` is accepted after a column (key columns are never `NULL` anyway). |
+| `UPSERT INTO t [(cols)] VALUES ... \| SELECT ...` | Inserts new rows. Rows whose primary key already exists get the given columns updated, and the key keeps its spelling. |
+| `INSERT OR REPLACE INTO ...` / `REPLACE INTO ...` | Inserts, or overwrites the whole existing row. Columns left out become `NULL`. |
+| `INSERT OR IGNORE INTO ...` | Inserts, and leaves existing rows alone. |
+| `INSERT ... ON CONFLICT [(cols)] DO NOTHING` | The same as `INSERT OR IGNORE`, matching on `cols` (default: the primary key). |
+| `INSERT ... ON CONFLICT [(cols)] DO UPDATE SET c = expr [, ...] [WHERE cond]` | Updates the existing row. In `expr` and `cond`, a plain or `t.`-qualified column is the row already in the table, and `excluded.col` is the row you tried to insert. Rows that fail `cond` stay unchanged. |
+| `INSERT ... ON DUPLICATE KEY UPDATE c = expr [, ...]` | MySQL style, matching on the primary key. `VALUES(col)` is the value you tried to insert. |
 | `UPDATE t [[AS] alias] SET col = expr [, col = expr ...] [WHERE cond]` | Changes the rows where `cond` is true, or every row without `WHERE`. `SET` expressions and `WHERE` can use the row's columns (`SET secs = secs - 1`), `?` and subqueries. Every `SET` is computed from the row as it was before the update, and a column can be set only once per statement. `SET t.col = ...` is accepted. |
 | `DELETE FROM t [[AS] alias] [WHERE cond]` | Removes the rows where `cond` is true, or every row without `WHERE`. The table itself stays; use `DROP TABLE` to remove it. `WHERE` can use the row's columns, `?` and subqueries, and is checked for every row before any row is removed. |
 | `DROP TABLE t` | Removes a user table. Built-in tables and other add-ons' tables can't be dropped. |
 | `REFRESH t` / `REFRESH ALL` | Clears cached rows. |
 | `SCAN abilities` / `SCAN items` | Rebuilds the id index (always a fresh scan). |
+| `SCAN savedvariables` | Finds other add-ons' SavedVariables again and rebuilds the tables made from them. |
 | `HELP` | A short syntax summary, one line per row. |
 
 A trailing `;` is allowed. Comments are `-- to end of line` and `/* ... */`.
@@ -591,7 +776,7 @@ Other expressions:
 - **Arithmetic:** `/` always gives a decimal (`10 / 4 = 2.5`). Dividing by zero, or `%` by zero, gives `NULL`. `%` follows `math.fmod`. Text in arithmetic is parsed as a number, and becomes `NULL` if it isn't one.
 - **`||`:** joins the text of both sides. If either side is `NULL`, the result is `NULL`.
 - **`CAST(x AS INT)`** truncates toward zero.
-- **`LIKE`:** `%` matches any run of characters and `_` matches one character. It ignores case and has no `ESCAPE`. For Lua patterns, use `MATCH()`.
+- **`LIKE`:** `%` matches any run of characters and `_` matches one character, ignoring case. `LIKE pattern ESCAPE 'c'` makes the character after `c` match itself: `LIKE '%100!%%' ESCAPE '!'` finds text containing `100%`. The escape is any single character, given as a constant, `?` or a column, and `ESCAPE NULL` gives `NULL`. A pattern that ends with the escape character is an error. To match text a player typed, escape it with `ESCAPE()` / `LibESQL.Escape`. For Lua patterns, use `MATCH()`.
 
 ### Aggregates
 
@@ -630,6 +815,8 @@ Unless noted, any `NULL` argument gives `NULL`. Text matching ignores case.
 | `CONCAT(a, b, ...)` | Joined text. `NULL`s are skipped. |
 | `CONCAT_WS(sep, a, b, ...)` | Joined with `sep`. `NULL`s are skipped. |
 | `PRINTF(fmt, ...)`, `FORMAT` | `string.format` |
+| `ESCAPE(s [, c])` | `s` with `%`, `_` and `c` (default `\`) prefixed by `c`, so it matches itself in `LIKE ... ESCAPE 'c'`: `name LIKE '%' \|\| ESCAPE(?) \|\| '%' ESCAPE '\'` |
+| `QUOTE(x)` | `x` as an SQL literal: `'it''s'`, `42`, `NULL`, `TRUE` (like `LibESQL.Quote`) |
 | `CHAR(n, ...)` | Characters from byte values |
 | `HEX(n)` | Upper-case hex |
 
@@ -661,8 +848,20 @@ Unless noted, any `NULL` argument gives `NULL`. Text matching ignores case.
 
 | Function | Result |
 |---|---|
-| `NOW()` | `GetTimeStamp()` (Unix seconds) |
-| `DATE(ts [, fmt])` | `os.date(fmt or "%Y-%m-%d %H:%M:%S", ts)` where `os.date` exists, otherwise the game's own formatting |
+| `NOW()`, `CURRENT_TIMESTAMP`, `LOCALTIMESTAMP` | The current local date and time as text, `'2026-11-20 14:05:33'` (like MySQL) |
+| `CURRENT_DATE`, `CURDATE()` | `'2026-11-20'` |
+| `CURRENT_TIME`, `CURTIME()` | `'14:05:33'` |
+| `UNIX_TIMESTAMP()` | Seconds since 1970 (UTC), the same as the game's `GetTimeStamp()`. Use it for numbers you store and do maths with. |
+| `UNIX_TIMESTAMP(text)` | Parses `'2026-11-20'`, `'2026-11-20 14:05'` or `'2026-11-20T14:05:33'` (local time) into seconds. Gives `NULL` for a date it can't read. |
+| `FROM_UNIXTIME(ts [, fmt])` | A stored timestamp as local date-time text, by default `'2026-11-20 14:05:33'` |
+| `DATE(ts [, fmt])` | Formats a timestamp, by default with the time. `DATE('2026-11-20 14:05:33')` gives the date part, `'2026-11-20'`. |
+
+Notes:
+- **Without brackets:** `CURRENT_TIMESTAMP`, `CURRENT_DATE`, `CURRENT_TIME` and `LOCALTIMESTAMP` can be written without brackets, as in standard SQL.
+- **Once per statement:** these zero-argument functions are worked out once per statement, so every row of one query gets the same time, even when the query is spread over several frames.
+- **Comparing:** the text forms sort correctly (`WHERE at > '2026-11-01'`).
+- **Doing maths:** for date maths, use `UNIX_TIMESTAMP()` numbers (`UNIX_TIMESTAMP() - 7 * 86400`), then show them with `FROM_UNIXTIME`.
+- **Format codes:** `fmt` uses `os.date` / strftime codes, such as `%Y %m %d %H %M %S`. Where the game has no `os.date` (console), the dates are worked out from `GetTimeStamp()` and the local clock (`GetDate`, `GetSecondsSinceMidnight`). That supports `%Y %y %m %d %H %M %S %%`, and uses the current UTC offset, so old timestamps from before a daylight-saving change can show one hour off.
 
 ### ESO
 
@@ -1603,6 +1802,55 @@ Kind: **static**  ·  Key: `name`
 |---|---|---|
 | `name` | text | SOUNDS key |
 | `value` | text | Sound id |
+
+### saved_variables
+
+Other add-ons' SavedVariables found in memory (read-only; SCAN savedvariables to refresh)  
+Kind: **live**  ·  Key: `name`
+
+| Column | Type | Description |
+|---|---|---|
+| `name` | text | Global name of the saved variable |
+| `addon` | text | Add-on it most likely belongs to (guessed from the name) |
+| `style` | text | ZO_SavedVars, or registered (added with LibESQL.AddSavedVariable) |
+| `accounts` | int | Accounts with data |
+| `characters` | int | Characters with their own data |
+| `account_wide` | bool | Has account-wide data |
+| `tables` | int | Tables generated from it |
+| `tables_list` | text | Names of those tables |
+| `nodes` | int | Tables inside it that were looked at |
+| `truncated` | bool | Too big to look through completely |
+
+### sv_tables
+
+Tables made from other add-ons' SavedVariables (each list of records becomes a table)  
+Kind: **live**  ·  Key: `table_name`
+
+| Column | Type | Description |
+|---|---|---|
+| `table_name` | text | Query it: SELECT * FROM <table_name> |
+| `sv` | text | Saved variable it comes from |
+| `addon` | text | Add-on it most likely belongs to |
+| `pattern` | text | Where the list is inside the saved variable (* = any key) |
+| `records` | int | Records when it was found |
+| `columns` | int | Columns |
+
+### sv_values
+
+Every value in other add-ons' SavedVariables, one row per value (filter with WHERE sv = '...')  
+Kind: **live**
+
+| Column | Type | Description |
+|---|---|---|
+| `sv` | text | Saved variable |
+| `addon` | text | Add-on it most likely belongs to |
+| `account` | text | @account |
+| `scope` | text | Character name, or account-wide |
+| `path` | text | Path inside the data, e.g. settings.window.x |
+| `key` | text | Last part of the path |
+| `value` | any | The value |
+| `type` | text | string, number or boolean |
+| `depth` | int | How deep it is |
 
 ---
 
